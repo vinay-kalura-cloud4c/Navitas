@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "moduleResolution": "node",
+    "jsx": "react-jsx",        // ← enable TSX/JSX parsing
+    "allowJs": true,           // ← include your .js files
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": "src",            // ← project root
+    "paths": {
+      "@/*": ["*"]        // ← @ → frontend/src/
+    },
+    "noEmit": true   
+  },
+  "include": [
+    "src"                 // ← pick up .ts/.tsx/.js/.jsx under src
+  ],
+  "exclude": [
+    "node_modules",
+    "public"
+  ]
+}
