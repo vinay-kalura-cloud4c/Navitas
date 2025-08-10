@@ -9,6 +9,7 @@ import { useSearchCache } from '../contexts/SearchCacheContext'
 function ProfileResults({ searchQuery, onBackToSearch, onNavigate, onNewSearch }) {
   const [profiles, setProfiles] = useState([])
   const [currentPage, setCurrentPage] = useState(1)
+  const [selectedProfiles, setSelectedProfiles] = useState(new Set())
   const profilesPerPage = 9
 
   const {
@@ -65,6 +66,7 @@ function ProfileResults({ searchQuery, onBackToSearch, onNavigate, onNewSearch }
 
       setProfiles(mapped)
       setCurrentPage(1)
+      setSelectedProfiles(new Set()) // Clear selection when new data loads
 
       // Cache the results
       setSearchResults(query, mapped)
@@ -79,8 +81,67 @@ function ProfileResults({ searchQuery, onBackToSearch, onNavigate, onNewSearch }
   const handleRefresh = () => {
     if (searchQuery) {
       invalidateCache(searchQuery)
+      setSelectedProfiles(new Set()) // Clear selection on refresh
       fetchSearchResults(searchQuery)
     }
+  }
+
+  const handleProfileSelection = (profileId, isSelected) => {
+    const newSelection = new Set(selectedProfiles)
+    if (isSelected) {
+      newSelection.add(profileId)
+    } else {
+      newSelection.delete(profileId)
+    }
+    setSelectedProfiles(newSelection)
+  }
+
+  const handleSelectAll = () => {
+    if (selectedProfiles.size === currentProfiles.length) {
+      // Deselect all current page profiles
+      const newSelection = new Set(selectedProfiles)
+      currentProfiles.forEach(profile => newSelection.delete(profile.id))
+      setSelectedProfiles(newSelection)
+    } else {
+      // Select all current page profiles
+      const newSelection = new Set(selectedProfiles)
+      currentProfiles.forEach(profile => newSelection.add(profile.id))
+      setSelectedProfiles(newSelection)
+    }
+  }
+
+  const handleSaveSelectedProfiles = () => {
+    if (selectedProfiles.size === 0) {
+      alert('Please select at least one profile to save.')
+      return
+    }
+
+    // Get existing saved profiles from localStorage
+    const existingSaved = JSON.parse(localStorage.getItem('savedProfiles') || '[]')
+    const existingSavedIds = new Set(existingSaved.map(profile => profile.id))
+
+    // Filter selected profiles and add job description
+    const profilesToSave = profiles
+      .filter(profile => selectedProfiles.has(profile.id) && !existingSavedIds.has(profile.id))
+      .map(profile => ({
+        ...profile,
+        job_description: searchQuery
+      }))
+
+    if (profilesToSave.length === 0) {
+      alert('All selected profiles are already saved!')
+      return
+    }
+
+    // Save to localStorage
+    const updatedSaved = [...existingSaved, ...profilesToSave]
+    localStorage.setItem('savedProfiles', JSON.stringify(updatedSaved))
+
+    // Show success message
+    alert(`${profilesToSave.length} profile(s) saved successfully!`)
+
+    // Clear selection after saving
+    setSelectedProfiles(new Set())
   }
 
   const totalPages = Math.ceil(profiles.length / profilesPerPage);
@@ -111,28 +172,8 @@ function ProfileResults({ searchQuery, onBackToSearch, onNavigate, onNewSearch }
   ]
 
   const loading = isLoading(searchQuery)
-
-  const handleSaveProfile = (profile) => {
-    // Get existing saved profiles from localStorage
-    const existingSaved = JSON.parse(localStorage.getItem('savedProfiles') || '[]')
-
-    // Check if profile is already saved
-    const isAlreadySaved = existingSaved.some(saved => saved.id === profile.id)
-
-    if (!isAlreadySaved) {
-      // Create enhanced profile object with job description
-      const enhancedProfile = {
-        ...profile,
-        job_description: searchQuery // Add the job description from searchQuery prop
-      }
-
-      const updatedSaved = [...existingSaved, enhancedProfile]
-      localStorage.setItem('savedProfiles', JSON.stringify(updatedSaved))
-      alert('Profile saved successfully!')
-    } else {
-      alert('Profile is already saved!')
-    }
-  }
+  const currentPageSelectedCount = currentProfiles.filter(profile => selectedProfiles.has(profile.id)).length
+  const allCurrentPageSelected = currentPageSelectedCount === currentProfiles.length && currentProfiles.length > 0
 
   return (
     <div className="min-h-screen flex">
@@ -213,18 +254,46 @@ function ProfileResults({ searchQuery, onBackToSearch, onNavigate, onNewSearch }
             </div>
           ) : (
             <>
-              <p className="text-lg text-slate-600 mb-6">
-                {profiles.length} profiles found
-              </p>
-              {/* feed the mapped cards into the demo component */}
+              <div className="flex justify-between items-center mb-6">
+                <p className="text-lg text-slate-600">
+                  {profiles.length} profiles found
+                </p>
+
+                {/* Selection Controls */}
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={allCurrentPageSelected}
+                      onChange={handleSelectAll}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      disabled={currentProfiles.length === 0}
+                    />
+                    <span className="text-sm text-slate-600">
+                      Select all on page ({currentPageSelectedCount}/{currentProfiles.length})
+                    </span>
+                  </div>
+
+                  {selectedProfiles.size > 0 && (
+                    <Button
+                      onClick={handleSaveSelectedProfiles}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      Save Selected ({selectedProfiles.size})
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* Feed the mapped cards into the demo component */}
               <ExpandableCardDemo
                 cards={currentProfiles}
-                onSave={handleSaveProfile}
-                showSaveButton={true}
+                selectedProfiles={selectedProfiles}
+                onProfileSelection={handleProfileSelection}
               />
 
               {totalPages > 1 && (
-                <div className="flex justify-center gap-2 mb-8">
+                <div className="flex justify-center gap-2 mb-8 mt-8">
                   <Button
                     disabled={currentPage === 1}
                     onClick={() => setCurrentPage(c => c - 1)}

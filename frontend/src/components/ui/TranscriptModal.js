@@ -3,13 +3,12 @@ import React, { useState, useMemo } from 'react';
 const TranscriptModal = ({ transcript, aiSummary, onClose }) => {
     console.log(aiSummary);
     const [searchTerm, setSearchTerm] = useState('');
-    const [activeTab, setActiveTab] = useState('transcript'); // ✅ Tab state for switching views
+    const [activeTab, setActiveTab] = useState('transcript');
 
     // Parse WEBVTT transcript into structured data
     const parsedTranscript = useMemo(() => {
         if (!transcript) return [];
 
-        // Split by double newlines to get individual entries
         const entries = transcript.split('\r\n\r\n').filter(entry =>
             entry.trim() &&
             !entry.startsWith('WEBVTT') &&
@@ -60,81 +59,184 @@ const TranscriptModal = ({ transcript, aiSummary, onClose }) => {
         );
     }, [parsedTranscript]);
 
-    // ✅ Function to render markdown-like text
+    // ✅ Improved markdown rendering function
     const renderMarkdown = (text) => {
-        if (!text) return <p className="text-gray-500">No AI summary available.</p>;
+        if (!text || typeof text !== 'string') {
+            return <p className="text-gray-500">No AI summary available.</p>;
+        }
 
-        return text.split('\n').map((line, index) => {
-            // Handle headers (##)
-            if (line.startsWith('## ')) {
-                return (
-                    <h2 key={index} className="text-xl font-bold text-gray-800 mt-6 mb-3 border-b-2 border-blue-200 pb-2">
-                        {line.replace('## ', '')}
-                    </h2>
-                );
-            }
+        // Clean and normalize the text
+        const cleanText = text
+            .replace(/\r\n/g, '\n')  // Normalize line endings
+            .replace(/\r/g, '\n')    // Handle different line ending formats
+            .trim();
 
-            // Handle numbered lists
-            if (/^\d+\.\s/.test(line)) {
-                const match = line.match(/^(\d+)\.\s\*\*(.*?)\*\*:\s*(.*)/);
-                if (match) {
-                    return (
-                        <div key={index} className="mb-4">
-                            <h3 className="font-semibold text-lg text-gray-700">
-                                {match[1]}. <span className="text-blue-600">{match[2]}</span>
-                            </h3>
-                            <p className="text-gray-600 ml-4 mt-1">{match[3]}</p>
-                        </div>
+        if (!cleanText) {
+            return <p className="text-gray-500">No AI summary available.</p>;
+        }
+
+        const lines = cleanText.split('\n');
+        const elements = [];
+        let currentListItems = [];
+        let listType = null; // 'numbered' or 'bullet'
+        
+        const flushList = () => {
+            if (currentListItems.length > 0) {
+                if (listType === 'numbered') {
+                    elements.push(
+                        <ol key={`list-${elements.length}`} className="list-decimal list-inside space-y-2 mb-4 ml-4">
+                            {currentListItems.map((item, idx) => (
+                                <li key={idx} className="text-gray-700">
+                                    {item}
+                                </li>
+                            ))}
+                        </ol>
+                    );
+                } else if (listType === 'bullet') {
+                    elements.push(
+                        <ul key={`list-${elements.length}`} className="list-disc list-inside space-y-1 mb-4 ml-4">
+                            {currentListItems.map((item, idx) => (
+                                <li key={idx} className="text-gray-600">
+                                    {item}
+                                </li>
+                            ))}
+                        </ul>
                     );
                 }
-                return <p key={index} className="mb-2 font-medium text-gray-700">{line}</p>;
+                currentListItems = [];
+                listType = null;
+            }
+        };
+
+        lines.forEach((line, index) => {
+            const trimmedLine = line.trim();
+            
+            // Skip empty lines but add spacing
+            if (!trimmedLine) {
+                flushList();
+                elements.push(<div key={`space-${index}`} className="mb-2"></div>);
+                return;
             }
 
-            // Handle bullet points with bold text
-            if (line.trim().startsWith('- **')) {
-                const match = line.match(/- \*\*(.*?)\*\*:\s*(.*)/);
-                if (match) {
-                    return (
-                        <div key={index} className="mb-2 ml-4">
-                            <span className="font-semibold text-blue-600">{match[1]}: </span>
-                            <span className="text-gray-600">{match[2]}</span>
-                        </div>
-                    );
+            // Handle headers (## or ###)
+            if (trimmedLine.match(/^#{1,3}\s/)) {
+                flushList();
+                const headerLevel = trimmedLine.match(/^(#{1,3})\s/)[1].length;
+                const headerText = trimmedLine.replace(/^#{1,3}\s/, '');
+                
+                const headerClasses = {
+                    1: 'text-2xl font-bold text-gray-800 mt-8 mb-4 border-b-2 border-blue-200 pb-2',
+                    2: 'text-xl font-bold text-gray-800 mt-6 mb-3 border-b-2 border-blue-200 pb-2',
+                    3: 'text-lg font-semibold text-gray-700 mt-4 mb-2'
+                };
+
+                const HeaderTag = `h${headerLevel}`;
+                elements.push(
+                    React.createElement(HeaderTag, {
+                        key: `header-${index}`,
+                        className: headerClasses[headerLevel]
+                    }, parseInlineFormatting(headerText))
+                );
+                return;
+            }
+
+            // Handle numbered lists (1. 2. 3. etc.)
+            const numberedMatch = trimmedLine.match(/^(\d+)\.\s+(.+)/);
+            if (numberedMatch) {
+                if (listType !== 'numbered') {
+                    flushList();
+                    listType = 'numbered';
                 }
+                
+                const listItemText = numberedMatch[2];
+                const formattedText = parseInlineFormatting(listItemText);
+                currentListItems.push(formattedText);
+                return;
             }
 
-            // Handle regular bullet points
-            if (line.trim().startsWith('- ')) {
-                return (
-                    <p key={index} className="mb-1 ml-4 text-gray-600">
-                        • {line.replace(/^\s*-\s*/, '')}
-                    </p>
-                );
+            // Handle bullet points (- or •)
+            const bulletMatch = trimmedLine.match(/^[-•]\s+(.+)/);
+            if (bulletMatch) {
+                if (listType !== 'bullet') {
+                    flushList();
+                    listType = 'bullet';
+                }
+                
+                const listItemText = bulletMatch[1];
+                const formattedText = parseInlineFormatting(listItemText);
+                currentListItems.push(formattedText);
+                return;
             }
 
-            // Handle bold text within paragraphs
-            if (line.includes('**')) {
-                const parts = line.split(/(\*\*.*?\*\*)/);
-                return (
-                    <p key={index} className="mb-2 text-gray-600 leading-relaxed">
-                        {parts.map((part, i) => {
-                            if (part.startsWith('**') && part.endsWith('**')) {
-                                return <strong key={i} className="font-semibold text-gray-800">{part.slice(2, -2)}</strong>;
-                            }
-                            return part;
-                        })}
-                    </p>
-                );
-            }
-
-            // Handle empty lines
-            if (line.trim() === '') {
-                return <div key={index} className="mb-2"></div>;
-            }
-
-            // Regular paragraphs
-            return <p key={index} className="mb-2 text-gray-600 leading-relaxed">{line}</p>;
+            // If we get here, it's a regular paragraph
+            flushList();
+            
+            // Handle paragraphs with inline formatting
+            const formattedText = parseInlineFormatting(trimmedLine);
+            elements.push(
+                <p key={`para-${index}`} className="mb-3 text-gray-700 leading-relaxed">
+                    {formattedText}
+                </p>
+            );
         });
+
+        // Don't forget to flush any remaining list items
+        flushList();
+
+        return <div className="markdown-content">{elements}</div>;
+    };
+
+    // ✅ Helper function to parse inline formatting (bold, italic, etc.)
+    const parseInlineFormatting = (text) => {
+        if (!text || typeof text !== 'string') return text;
+
+        const elements = [];
+        let currentIndex = 0;
+        
+        // Regular expression to match **bold**, *italic*, and `code`
+        const inlineRegex = /(\*\*([^*]+)\*\*|\*([^*]+)\*|`([^`]+)`)/g;
+        let match;
+
+        while ((match = inlineRegex.exec(text)) !== null) {
+            // Add text before the match
+            if (match.index > currentIndex) {
+                elements.push(text.slice(currentIndex, match.index));
+            }
+
+            const fullMatch = match[1];
+            const boldText = match[2];
+            const italicText = match[3];
+            const codeText = match[4];
+
+            if (boldText) {
+                elements.push(
+                    <strong key={`bold-${match.index}`} className="font-semibold text-gray-800">
+                        {boldText}
+                    </strong>
+                );
+            } else if (italicText) {
+                elements.push(
+                    <em key={`italic-${match.index}`} className="italic text-gray-700">
+                        {italicText}
+                    </em>
+                );
+            } else if (codeText) {
+                elements.push(
+                    <code key={`code-${match.index}`} className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono text-gray-800">
+                        {codeText}
+                    </code>
+                );
+            }
+
+            currentIndex = match.index + fullMatch.length;
+        }
+
+        // Add remaining text
+        if (currentIndex < text.length) {
+            elements.push(text.slice(currentIndex));
+        }
+
+        return elements.length > 0 ? elements : text;
     };
 
     const exportTranscript = () => {
@@ -153,7 +255,6 @@ const TranscriptModal = ({ transcript, aiSummary, onClose }) => {
         URL.revokeObjectURL(url);
     };
 
-    // ✅ Export AI summary function
     const exportAISummary = () => {
         if (!aiSummary) return;
 
@@ -192,7 +293,7 @@ const TranscriptModal = ({ transcript, aiSummary, onClose }) => {
                     </button>
                 </div>
 
-                {/* ✅ Tab Navigation */}
+                {/* Tab Navigation */}
                 <div className="border-b bg-gray-50">
                     <div className="flex">
                         <button
@@ -251,10 +352,13 @@ const TranscriptModal = ({ transcript, aiSummary, onClose }) => {
                     </div>
                 )}
 
-                {/* ✅ AI Analysis Controls - Only show for analysis tab */}
+                {/* AI Analysis Controls - Only show for analysis tab */}
                 {activeTab === 'analysis' && (
                     <div className="p-4 border-b bg-gray-50">
-                        <div className="flex justify-end">
+                        <div className="flex justify-between items-center">
+                            <div className="text-sm text-gray-600">
+                                {aiSummary ? `Analysis ready • ${aiSummary.length} characters` : 'No analysis available'}
+                            </div>
                             <button
                                 onClick={exportAISummary}
                                 disabled={!aiSummary}
@@ -297,7 +401,7 @@ const TranscriptModal = ({ transcript, aiSummary, onClose }) => {
                             </div>
                         )
                     ) : (
-                        // ✅ AI Analysis Content
+                        // AI Analysis Content
                         <div className="max-w-4xl">
                             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 mb-6 border border-blue-200">
                                 <div className="flex items-center mb-2">
@@ -310,8 +414,17 @@ const TranscriptModal = ({ transcript, aiSummary, onClose }) => {
                                 </p>
                             </div>
 
-                            <div className="prose prose-blue max-w-none">
-                                {renderMarkdown(aiSummary)}
+                            {/* ✅ Improved markdown rendering with better error handling */}
+                            <div className="prose prose-blue max-w-none bg-white p-6 rounded-lg border">
+                                {aiSummary ? (
+                                    renderMarkdown(aiSummary)
+                                ) : (
+                                    <div className="text-center text-gray-500 py-8">
+                                        <div className="text-4xl mb-4">📊</div>
+                                        <p className="text-lg font-medium">No Analysis Available</p>
+                                        <p className="text-sm mt-2">The AI analysis will appear here after processing the interview transcript.</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

@@ -1,35 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import DateTimePicker from './ui/DateTimePicker'
 import QuestionModal from './ui/QuestionModal'
-import { PublicClientApplication } from '@azure/msal-browser'
 import TranscriptModal from './ui/TranscriptModal'
-
-// MSAL Configuration
-const msalConfig = {
-  auth: {
-    clientId: process.env.REACT_APP_CLIENT_ID || "c97dc8fe-26ae-40a9-8681-906ebd65211b",
-    authority: `https://login.microsoftonline.com/${process.env.REACT_APP_TENANT_ID || "512ec501-cb12-46d1-bbef-7f52f8ad2df8"}`,
-    redirectUri: process.env.REACT_APP_REDIRECT_URI || "http://localhost:3001"
-  },
-  cache: {
-    cacheLocation: "sessionStorage",
-    storeAuthStateInCookie: false
-  }
-};
-
-const loginRequest = {
-  scopes: [
-    "https://graph.microsoft.com/Calendars.ReadWrite",
-    "https://graph.microsoft.com/OnlineMeetings.ReadWrite",
-    "https://graph.microsoft.com/User.Read",
-    "https://graph.microsoft.com/Mail.Send",
-    "https://graph.microsoft.com/OnlineMeetingTranscript.Read.All"
-  ],
-  prompt: "select_account"
-};
-
-// Initialize MSAL instance
-const msalInstance = new PublicClientApplication(msalConfig);
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://127.0.0.1:8000';
 
@@ -46,145 +18,19 @@ const SavedProfileListItem = ({
   onEmailAddressChange,
   status,
   onStatusChange,
-  onTranscriptClick
+  onTranscriptClick,
+  // New props for centralized auth
+  isAuthenticated,
+  onAuthRequired
 }) => {
   const [showQuestions, setShowQuestions] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authLoading, setAuthLoading] = useState(false);
   const [meetingLoading, setMeetingLoading] = useState(false);
-  const [msalInitialized, setMsalInitialized] = useState(false);
-  const [showTranscript, setShowTranscript] = useState(false); // ✅ Add transcript modal state
-  const [currentTranscript, setCurrentTranscript] = useState(''); // ✅ Add 
-  const [aiSummary, setAiSummary] = useState(''); // ✅ Add AI summary state  
-  // Initialize MSAL and check authentication status
-  useEffect(() => {
-    const initializeMsal = async () => {
-      try {
-        // ✅ Initialize MSAL before any other operations
-        await msalInstance.initialize();
-        setMsalInitialized(true);
-        console.log('MSAL initialized successfully');
+  const [showTranscript, setShowTranscript] = useState(false);
+  const [currentTranscript, setCurrentTranscript] = useState('');
+  const [aiSummary, setAiSummary] = useState('');
 
-        // Check if user is already logged in
-        const accounts = msalInstance.getAllAccounts();
-        if (accounts.length > 0) {
-          // User already has an active session
-          await acquireTokenSilently();
-        }
-
-        // Check backend authentication status
-        await checkAuthStatus();
-      } catch (error) {
-        console.error('MSAL initialization failed:', error);
-      }
-    };
-
-    initializeMsal();
-  }, []);
-
-  // Acquire token silently for existing sessions
-  const acquireTokenSilently = async () => {
-    try {
-      const accounts = msalInstance.getAllAccounts();
-      if (accounts.length === 0) return;
-
-      const silentRequest = {
-        ...loginRequest,
-        account: accounts[0]
-      };
-
-      const response = await msalInstance.acquireTokenSilent(silentRequest);
-
-      // Send token to backend
-      await sendTokenToBackend(response.accessToken);
-      setIsAuthenticated(true);
-    } catch (error) {
-      console.log('Silent token acquisition failed:', error);
-      // This is expected if user needs to re-authenticate
-    }
-  };
-
-  const checkAuthStatus = async () => {
-    try {
-      const response = await fetch(`${BACKEND_URL}/auth-status`);
-      const data = await response.json();
-      setIsAuthenticated(data.authenticated);
-    } catch (error) {
-      console.error('Error checking auth status:', error);
-      setIsAuthenticated(false);
-    }
-  };
-
-  // Send token to backend helper
-  const sendTokenToBackend = async (accessToken) => {
-    const response = await fetch(`${BACKEND_URL}/set-token`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      credentials: 'include',
-      body: JSON.stringify({ access_token: accessToken })
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to authenticate with backend');
-    }
-
-    return response;
-  };
-
-  // Handle login with proper initialization check
-  const handleLogin = async () => {
-    if (!msalInitialized) {
-      console.error('MSAL not initialized yet');
-      alert('Authentication system is still loading. Please try again in a moment.');
-      return;
-    }
-
-    setAuthLoading(true);
-    try {
-      const loginResponse = await msalInstance.loginPopup(loginRequest);
-      const accessToken = loginResponse.accessToken;
-
-      // Send token to Python backend
-      const res = await sendTokenToBackend(accessToken);
-      console.log('Token sent to backend:', res);
-      setIsAuthenticated(true);
-      console.log('Authentication successful');
-
-    } catch (error) {
-      console.error('Login failed:', error);
-      alert('Authentication failed. Please try again.');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  // Handle logout
-  const handleLogout = async () => {
-    if (!msalInitialized) {
-      console.error('MSAL not initialized');
-      return;
-    }
-
-    try {
-      const accounts = msalInstance.getAllAccounts();
-      if (accounts.length > 0) {
-        await msalInstance.logoutPopup({
-          account: accounts[0]
-        });
-      }
-
-      await fetch(`${BACKEND_URL}/logout`, { method: 'POST' });
-      setIsAuthenticated(false);
-    } catch (error) {
-      console.error('Logout failed:', error);
-    }
-  };
-
-  // Rest of your component methods remain the same...
+  // Secure API call helper
   const secureApiCall = async (url, options = {}) => {
     const response = await fetch(url, {
       ...options,
@@ -197,8 +43,7 @@ const SavedProfileListItem = ({
     });
 
     if (response.status === 401) {
-      setIsAuthenticated(false);
-      alert('Session expired. Please login again.');
+      onAuthRequired?.(); // Notify parent that auth is required
       throw new Error('Authentication required');
     }
 
@@ -257,10 +102,10 @@ const SavedProfileListItem = ({
     }
   };
 
-  // Schedule meeting with authentication
+  // Schedule meeting with authentication check
   const scheduleMeeting = async () => {
     if (!isAuthenticated) {
-      alert('Please login first to schedule meetings.');
+      onAuthRequired?.();
       return;
     }
 
@@ -272,7 +117,7 @@ const SavedProfileListItem = ({
     setMeetingLoading(true);
     try {
       const meetingData = {
-        organizer_email: "vinay.kalura@cloud4c.com",  // ✅ Added missing field - use "me" for authenticated user
+        organizer_email: "vinay.kalura@cloud4c.com",
         subject: `Interview for ${profile.name}`,
         attendees: emailAddress ? [emailAddress] : [],
         start_time: selectedDateTime,
@@ -291,22 +136,22 @@ const SavedProfileListItem = ({
       const result = await response.json();
       console.log('Meeting scheduled:', result);
       alert('Meeting scheduled successfully!');
-
-      // Update status
       onStatusChange(profile.id, 'Invite Sent');
 
     } catch (error) {
       console.error('Error scheduling meeting:', error);
-      alert('Failed to schedule meeting. Please try again.');
+      if (error.message !== 'Authentication required') {
+        alert('Failed to schedule meeting. Please try again.');
+      }
     } finally {
       setMeetingLoading(false);
     }
   };
 
-  // Send email with authentication
+  // Send email with authentication check
   const sendEmail = async () => {
     if (!isAuthenticated) {
-      alert('Please login first to send emails.');
+      onAuthRequired?.();
       return;
     }
 
@@ -337,15 +182,16 @@ const SavedProfileListItem = ({
 
     } catch (error) {
       console.error('Error sending email:', error);
-      alert('Failed to send email. Please try again.');
+      if (error.message !== 'Authentication required') {
+        alert('Failed to send email. Please try again.');
+      }
     }
   };
 
-  // Get transcript with authentication
-  // Get transcript with authentication
+  // Get transcript with authentication check
   const getTranscript = async (meetingId) => {
     if (!isAuthenticated) {
-      alert('Please login first to access transcripts.');
+      onAuthRequired?.();
       return;
     }
 
@@ -379,25 +225,21 @@ const SavedProfileListItem = ({
       const result = await response.json();
       const transcript = result.transcript;
 
-      // ✅ Extract AI summary content from the nested object structure
       const aiSummaryContent = result.ai_summary?.content ||
         result.ai_summary?.message?.content ||
         result.ai_summary ||
         '';
 
-      // ✅ Create data object to store in session storage
       const transcriptData = {
         transcript: transcript,
         aiSummary: aiSummaryContent,
-        timestamp: new Date().toISOString(), // Optional: for cache expiry
+        timestamp: new Date().toISOString(),
         meetingId: meetingId
       };
 
-      // ✅ Store complete data in session storage
       sessionStorage.setItem(storageKey, JSON.stringify(transcriptData));
       console.log('Transcript data stored in session storage');
 
-      // ✅ Update component state
       setCurrentTranscript(transcript);
       setAiSummary(aiSummaryContent);
       setShowTranscript(true);
@@ -406,14 +248,13 @@ const SavedProfileListItem = ({
 
     } catch (error) {
       console.error('Error getting transcript:', error);
-      alert('Failed to get transcript. Please try again.');
+      if (error.message !== 'Authentication required') {
+        alert('Failed to get transcript. Please try again.');
+      }
     }
   };
 
-
-  // ✅ Function to handle transcript button click
   const handleTranscriptClick = async () => {
-    // You can either hardcode a meeting ID for testing or get it dynamically
     const meetingId = 'MSpmNWM3ZTM3MS0xOWUwLTQzY2MtYmVmMi0xYTM4YWZjYTBkMTAqMCoqMTk6bWVldGluZ19aRFE1TUdaa1l6RXRZakJsTkMwME9Ua3hMV0kwWWpBdE4yRXpOamxqT1RBMU56VTNAdGhyZWFkLnYy';
     await getTranscript(meetingId);
   };
@@ -427,42 +268,6 @@ const SavedProfileListItem = ({
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6 mb-4 border border-gray-200">
-      {/* Authentication Status Bar */}
-      <div className="mb-4 p-3 rounded-md bg-gray-50 border">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <span className={`inline-block w-2 h-2 rounded-full mr-2 ${!msalInitialized ? 'bg-yellow-500' :
-              isAuthenticated ? 'bg-green-500' : 'bg-red-500'
-              }`}></span>
-            <span className="text-sm font-medium">
-              {!msalInitialized ? 'Initializing...' :
-                isAuthenticated ? 'Authenticated' : 'Not Authenticated'}
-            </span>
-          </div>
-          <div>
-            {!isAuthenticated ? (
-              <button
-                onClick={handleLogin}
-                disabled={authLoading || !msalInitialized}
-                className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-              >
-                {authLoading ? 'Logging in...' :
-                  !msalInitialized ? 'Please wait...' : 'Login'}
-              </button>
-            ) : (
-              <button
-                onClick={handleLogout}
-                disabled={!msalInitialized}
-                className="px-3 py-1 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
-              >
-                Logout
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Rest of your JSX remains the same... */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         {/* Profile Info */}
         <div className="lg:col-span-3">
@@ -538,13 +343,16 @@ const SavedProfileListItem = ({
             {loading ? 'Generating...' : hasStoredQuestions ? 'Display Questions' : 'Generate Questions'}
           </button>
 
-          {/* Send Email Button */}
+          {/* Send Email Button with Auth Check */}
           <button
             onClick={sendEmail}
-            disabled={!isAuthenticated || !emailAddress || !msalInitialized}
-            className="w-full px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!emailAddress}
+            className={`w-full px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${!isAuthenticated
+                ? 'text-purple-700 bg-purple-50 border border-purple-300 hover:bg-purple-100'
+                : 'text-white bg-purple-600 hover:bg-purple-700'
+              } ${!emailAddress ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            Send Email
+            {!isAuthenticated ? '🔒 Send Email (Login Required)' : 'Send Email'}
           </button>
         </div>
 
@@ -568,25 +376,30 @@ const SavedProfileListItem = ({
             className="w-full mb-2"
           />
 
-          {/* Schedule Meeting Button */}
+          {/* Schedule Meeting Button with Auth Check */}
           <button
             onClick={scheduleMeeting}
-            disabled={!isAuthenticated || meetingLoading || !selectedDateTime || !msalInitialized}
-            className="w-full px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={meetingLoading || !selectedDateTime}
+            className={`w-full px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 ${!isAuthenticated
+                ? 'text-green-700 bg-green-50 border border-green-300 hover:bg-green-100'
+                : 'text-white bg-green-600 hover:bg-green-700'
+              } ${(!selectedDateTime || meetingLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            {meetingLoading ? 'Scheduling...' : 'Schedule Meeting'}
+            {meetingLoading ? 'Scheduling...' : !isAuthenticated ? '🔒 Schedule (Login Required)' : 'Schedule Meeting'}
           </button>
         </div>
 
-        {/* Transcript Button */}
+        {/* Transcript Button with Auth Check */}
         <div className="lg:col-span-1 flex flex-col items-center">
           <label className="text-sm font-medium text-gray-700 mb-2 lg:hidden">Transcript</label>
           <button
-            onClick={handleTranscriptClick} // ✅ Updated click handler
-            disabled={!isAuthenticated || !msalInitialized}
-            className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-300 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            onClick={handleTranscriptClick}
+            className={`px-3 py-2 text-sm font-medium border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${!isAuthenticated
+                ? 'text-blue-700 bg-blue-50 border-blue-300 hover:bg-blue-100'
+                : 'text-blue-700 bg-blue-50 border-blue-300 hover:bg-blue-100'
+              }`}
           >
-            Transcript
+            {!isAuthenticated ? '🔒 Transcript' : 'Transcript'}
           </button>
         </div>
 
@@ -603,10 +416,8 @@ const SavedProfileListItem = ({
 
       {showTranscript && (
         <TranscriptModal
-          transcript={currentTranscript
-
-          }
-          aiSummary={aiSummary} // Assuming you have an AI summary in the profile
+          transcript={currentTranscript}
+          aiSummary={aiSummary}
           onClose={() => setShowTranscript(false)}
         />
       )}

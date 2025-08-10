@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from './ui/Button'
 import SavedProfileListItem from './SavedProfileListItem'
+import AuthenticationHeader from './AuthenticationHeader'
 import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar"
 import { IconHome, IconBookmark, IconSearch } from "@tabler/icons-react"
 import { useSearchCache } from '../contexts/SearchCacheContext'
@@ -17,6 +18,9 @@ function SavedProfiles({ onNavigate, onNewSearch, hasSearchResults }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [profileStatuses, setProfileStatuses] = useState({})
   const [transcriptPopup, setTranscriptPopup] = useState({ visible: false, profileId: null })
+
+  // ✅ Add authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   const { currentQuery, isCacheValid } = useSearchCache()
 
@@ -41,6 +45,19 @@ function SavedProfiles({ onNavigate, onNewSearch, hasSearchResults }) {
       setProfileStatuses(initialStatuses)
     }
   }, [])
+
+  // ✅ Handle authentication changes
+  const handleAuthChange = (authenticated) => {
+    setIsAuthenticated(authenticated)
+  }
+
+  // ✅ Handle authentication required
+  const handleAuthRequired = () => {
+    // Scroll to top where the auth header is
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    // You could also show a toast notification here
+    alert('Please connect your Microsoft account to use this feature.')
+  }
 
   const clearAllSaved = () => {
     localStorage.removeItem('savedProfiles')
@@ -125,6 +142,12 @@ function SavedProfiles({ onNavigate, onNewSearch, hasSearchResults }) {
   }
 
   const handleSubmit = async () => {
+    // ✅ Add authentication check for bulk scheduling
+    if (!isAuthenticated) {
+      handleAuthRequired()
+      return
+    }
+
     // Validation: Check required fields
     if (!meetingSubject.trim()) {
       alert('Please provide a meeting subject.')
@@ -309,148 +332,159 @@ function SavedProfiles({ onNavigate, onNewSearch, hasSearchResults }) {
         </SidebarBody>
       </Sidebar>
 
-      <div className="flex-1 bg-gradient-to-br from-slate-50 to-slate-100 p-6">
-        <div className="max-w-7xl mx-auto">
-          <header className="mb-8 text-center">
-            <h1 className="text-4xl font-bold text-slate-800 mb-4">
-              Saved Profiles
-            </h1>
-            <p className="text-lg text-slate-600 mb-6">
-              {savedProfiles.length} saved profiles
-            </p>
-            {savedProfiles.length > 0 && (
-              <div className="flex justify-center gap-4 mb-6">
+      <div className="flex-1 bg-gradient-to-br from-slate-50 to-slate-100">
+        {/* ✅ Add Authentication Header */}
+        <AuthenticationHeader onAuthChange={handleAuthChange} />
+
+        <div className="p-6">
+          <div className="max-w-7xl mx-auto">
+            <header className="mb-8 text-center">
+              <h1 className="text-4xl font-bold text-slate-800 mb-4">
+                Saved Profiles
+              </h1>
+              <p className="text-lg text-slate-600 mb-6">
+                {savedProfiles.length} saved profiles
+              </p>
+              {savedProfiles.length > 0 && (
+                <div className="flex justify-center gap-4 mb-6">
+                  <Button
+                    onClick={clearAllSaved}
+                    variant="outline"
+                    className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700"
+                  >
+                    Clear All Saved
+                  </Button>
+                </div>
+              )}
+            </header>
+
+            {savedProfiles.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-6xl mb-4">📭</div>
+                <h2 className="text-2xl font-semibold text-slate-700 mb-2">No saved profiles yet</h2>
+                <p className="text-slate-500 mb-6">Start saving profiles from your search results!</p>
                 <Button
-                  onClick={clearAllSaved}
-                  variant="outline"
-                  className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700"
+                  onClick={() => onNavigate('landing')}
+                  className="bg-blue-600 hover:bg-blue-700"
                 >
-                  Clear All Saved
+                  Go to Search
                 </Button>
               </div>
+            ) : (
+              <>
+                {/* Meeting Configuration Form */}
+                <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                  <h3 className="text-xl font-semibold text-slate-800 mb-4">Meeting Configuration</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Meeting Subject *
+                      </label>
+                      <input
+                        type="text"
+                        value={meetingSubject}
+                        onChange={(e) => setMeetingSubject(e.target.value)}
+                        placeholder="Team Meeting"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Duration (minutes)
+                      </label>
+                      <select
+                        value={durationMinutes}
+                        onChange={(e) => setDurationMinutes(parseInt(e.target.value))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value={15}>15 minutes</option>
+                        <option value={30}>30 minutes</option>
+                        <option value={45}>45 minutes</option>
+                        <option value={60}>1 hour</option>
+                        <option value={90}>1.5 hours</option>
+                        <option value={120}>2 hours</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Additional Email (optional)
+                      </label>
+                      <input
+                        type="email"
+                        value={additionalEmail}
+                        onChange={(e) => setAdditionalEmail(e.target.value)}
+                        placeholder="additional@email.com"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Will be added to all meetings</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column Headers */}
+                <div className="bg-gray-50 rounded-lg p-4 mb-4 hidden lg:block">
+                  <div className="grid grid-cols-12 gap-4 text-sm font-medium text-gray-700">
+                    <div className="col-span-3">Profile Information</div>
+                    <div className="col-span-1 text-center">Status</div>
+                    <div className="col-span-1 text-center">Email</div>
+                    <div className="col-span-2 text-center">Email Address</div>
+                    <div className="col-span-1 text-center">Invitation</div>
+                    <div className="col-span-2 text-center">Meeting Time</div>
+                    <div className="col-span-1 text-center">Transcript</div>
+                    <div className="col-span-1 text-center">Actions</div>
+                  </div>
+                </div>
+
+                {/* Profile List */}
+                <div className="space-y-4 mb-8">
+                  {savedProfiles.map((profile) => (
+                    <SavedProfileListItem
+                      key={profile.id}
+                      profile={profile}
+                      onRemove={removeSavedProfile}
+                      emailChecked={emailSelections[profile.id] || false}
+                      onEmailChange={handleEmailChange}
+                      invitationChecked={invitationSelections[profile.id] || false}
+                      onInvitationChange={handleInvitationChange}
+                      selectedDateTime={dateTimes[profile.id]}
+                      onDateTimeChange={handleDateTimeChange}
+                      emailAddress={emailAddresses[profile.id] || ''}
+                      onEmailAddressChange={handleEmailAddressChange}
+                      status={profileStatuses[profile.id] || 'Under Review'}
+                      onStatusChange={handleStatusChange}
+                      onTranscriptClick={handleTranscriptClick}
+                      isAuthenticated={isAuthenticated}
+                      onAuthRequired={handleAuthRequired}
+                    />
+                  ))}
+                </div>
+
+                {/* Submit Button with Auth Check */}
+                <div className="flex justify-center pt-6 border-t border-gray-200">
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={!hasSelections || isSubmitting}
+                    className={`px-8 py-3 text-lg font-semibold ${hasSelections && !isSubmitting
+                      ? isAuthenticated
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                        : 'bg-blue-50 text-blue-700 border border-blue-300 hover:bg-blue-100'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      }`}
+                  >
+                    {isSubmitting
+                      ? 'Scheduling Meetings...'
+                      : hasSelections
+                        ? !isAuthenticated
+                          ? `🔒 Schedule ${Object.values(emailSelections).filter(Boolean).length + Object.values(invitationSelections).filter(Boolean).length} Meeting(s) (Login Required)`
+                          : `Schedule ${Object.values(emailSelections).filter(Boolean).length + Object.values(invitationSelections).filter(Boolean).length} Individual Meeting(s)`
+                        : 'Select profiles to schedule meetings'
+                    }
+                  </Button>
+                </div>
+              </>
             )}
-          </header>
-
-          {savedProfiles.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">📭</div>
-              <h2 className="text-2xl font-semibold text-slate-700 mb-2">No saved profiles yet</h2>
-              <p className="text-slate-500 mb-6">Start saving profiles from your search results!</p>
-              <Button
-                onClick={() => onNavigate('landing')}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                Go to Search
-              </Button>
-            </div>
-          ) : (
-            <>
-              {/* Meeting Configuration Form */}
-              <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h3 className="text-xl font-semibold text-slate-800 mb-4">Meeting Configuration</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Meeting Subject *
-                    </label>
-                    <input
-                      type="text"
-                      value={meetingSubject}
-                      onChange={(e) => setMeetingSubject(e.target.value)}
-                      placeholder="Team Meeting"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Duration (minutes)
-                    </label>
-                    <select
-                      value={durationMinutes}
-                      onChange={(e) => setDurationMinutes(parseInt(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value={15}>15 minutes</option>
-                      <option value={30}>30 minutes</option>
-                      <option value={45}>45 minutes</option>
-                      <option value={60}>1 hour</option>
-                      <option value={90}>1.5 hours</option>
-                      <option value={120}>2 hours</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Additional Email (optional)
-                    </label>
-                    <input
-                      type="email"
-                      value={additionalEmail}
-                      onChange={(e) => setAdditionalEmail(e.target.value)}
-                      placeholder="additional@email.com"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Will be added to all meetings</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Column Headers */}
-              <div className="bg-gray-50 rounded-lg p-4 mb-4 hidden lg:block">
-                <div className="grid grid-cols-12 gap-4 text-sm font-medium text-gray-700">
-                  <div className="col-span-3">Profile Information</div>
-                  <div className="col-span-1 text-center">Status</div>
-                  <div className="col-span-1 text-center">Email</div>
-                  <div className="col-span-2 text-center">Email Address</div>
-                  <div className="col-span-1 text-center">Invitation</div>
-                  <div className="col-span-2 text-center">Meeting Time</div>
-                  <div className="col-span-1 text-center">Transcript</div>
-                  <div className="col-span-1 text-center">Actions</div>
-                </div>
-              </div>
-
-              {/* Profile List */}
-              <div className="space-y-4 mb-8">
-                {savedProfiles.map((profile) => (
-                  <SavedProfileListItem
-                    key={profile.id}
-                    profile={profile}
-                    onRemove={removeSavedProfile}
-                    emailChecked={emailSelections[profile.id] || false}
-                    onEmailChange={handleEmailChange}
-                    invitationChecked={invitationSelections[profile.id] || false}
-                    onInvitationChange={handleInvitationChange}
-                    selectedDateTime={dateTimes[profile.id]}
-                    onDateTimeChange={handleDateTimeChange}
-                    emailAddress={emailAddresses[profile.id] || ''}
-                    onEmailAddressChange={handleEmailAddressChange}
-                    status={profileStatuses[profile.id] || 'Under Review'}
-                    onStatusChange={handleStatusChange}
-                    onTranscriptClick={handleTranscriptClick}
-                  />
-                ))}
-              </div>
-
-              {/* Submit Button */}
-              <div className="flex justify-center pt-6 border-t border-gray-200">
-                <Button
-                  onClick={handleSubmit}
-                  disabled={!hasSelections || isSubmitting}
-                  className={`px-8 py-3 text-lg font-semibold ${hasSelections && !isSubmitting
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    }`}
-                >
-                  {isSubmitting
-                    ? 'Scheduling Meetings...'
-                    : hasSelections
-                      ? `Schedule ${Object.values(emailSelections).filter(Boolean).length + Object.values(invitationSelections).filter(Boolean).length} Individual Meeting(s)`
-                      : 'Select profiles to schedule meetings'
-                  }
-                </Button>
-              </div>
-            </>
-          )}
+          </div>
         </div>
       </div>
 

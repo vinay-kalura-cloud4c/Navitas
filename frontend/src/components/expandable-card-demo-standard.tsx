@@ -16,15 +16,15 @@ export interface Profile {
 
 export default function ExpandableCardDemo({
   cards,
-  onSave,
+  selectedProfiles,
+  onProfileSelection,
   onRemove,
-  showSaveButton = false,
   showRemoveButton = false,
 }: {
   cards: Profile[];
-  onSave?: (profile: Profile) => void;
+  selectedProfiles?: Set<string | number>;
+  onProfileSelection?: (profileId: string | number, isSelected: boolean) => void;
   onRemove?: (profileId: string | number) => void;
-  showSaveButton?: boolean;
   showRemoveButton?: boolean;
 }) {
   const [active, setActive] = useState<Profile | null>(null);
@@ -39,6 +39,12 @@ export default function ExpandableCardDemo({
   }, [active]);
 
   useOutsideClick(ref, () => setActive(null));
+
+  const handleCheckboxChange = (profileId: string | number, isChecked: boolean) => {
+    if (onProfileSelection) {
+      onProfileSelection(profileId, isChecked);
+    }
+  };
 
   return (
     <>
@@ -68,7 +74,7 @@ export default function ExpandableCardDemo({
             <motion.div
               layoutId={`card-${active.id}-${id}`}
               ref={ref}
-              className="w-full max-w-xl bg-white p-6 rounded-xl shadow-lg overflow-auto"
+              className="w-full max-w-xl bg-white p-6 rounded-xl shadow-lg overflow-auto max-h-[80vh]"
             >
               <motion.h3
                 layoutId={`title-${active.id}-${id}`}
@@ -90,19 +96,18 @@ export default function ExpandableCardDemo({
                 View profile link
               </a>
               <p className="text-sm text-gray-500 mb-4">Score: {active.score}</p>
-              
-              <div className="flex gap-2">
-                {showSaveButton && onSave && (
-                  <Button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSave(active);
-                    }}
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    Save Profile
-                  </Button>
+
+              <div className="flex gap-2 items-center">
+                {selectedProfiles && onProfileSelection && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedProfiles.has(active.id)}
+                      onChange={(e) => handleCheckboxChange(active.id, e.target.checked)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-600">Select for saving</span>
+                  </div>
                 )}
                 {showRemoveButton && onRemove && (
                   <Button
@@ -125,55 +130,59 @@ export default function ExpandableCardDemo({
       </AnimatePresence>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {cards.map((card) => (
-          <motion.div
-            key={card.id}
-            layoutId={`card-${card.id}-${id}`}
-            onClick={() => setActive(card)}
-            className="p-4 bg-white rounded-lg shadow hover:shadow-md cursor-pointer"
-          >
-            <motion.h3
-              layoutId={`title-${card.id}-${id}`}
-              className="font-bold text-lg mb-1"
+        {cards.map((card) => {
+          const isSelected = selectedProfiles?.has(card.id) || false;
+
+          return (
+            <motion.div
+              key={card.id}
+              layoutId={`card-${card.id}-${id}`}
+              className={`p-4 bg-white rounded-lg shadow hover:shadow-md cursor-pointer transition-all duration-200 ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50' : ''
+                }`}
             >
-              {card.name}
-            </motion.h3>
-            {/* <motion.p
-              layoutId={`description-${card.id}-${id}`}
-              className="text-sm text-gray-600 mb-2"
-            >
-              {card.short_summary}
-            </motion.p> */}
-            <div className="flex gap-2 items-center">
-              <Button size="sm">View Details</Button>
-              {showSaveButton && onSave && (
-                <Button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSave(card);
-                  }}
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  Save
-                </Button>
+              {/* Checkbox in top-right corner */}
+              {selectedProfiles && onProfileSelection && (
+                <div className="flex justify-end mb-2">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      handleCheckboxChange(card.id, e.target.checked);
+                    }}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                </div>
               )}
-              {showRemoveButton && onRemove && (
-                <Button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemove(card.id);
-                  }}
-                  size="sm"
-                  variant="outline"
-                  className="border-red-300 text-red-700 hover:bg-red-50"
+
+              <div onClick={() => setActive(card)}>
+                <motion.h3
+                  layoutId={`title-${card.id}-${id}`}
+                  className="font-bold text-lg mb-1"
                 >
-                  Remove
-                </Button>
-              )}
-            </div>
-          </motion.div>
-        ))}
+                  {card.name}
+                </motion.h3>
+
+                <div className="flex gap-2 items-center mt-3">
+                  <Button size="sm">View Details</Button>
+                  {showRemoveButton && onRemove && (
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemove(card.id);
+                      }}
+                      size="sm"
+                      variant="outline"
+                      className="border-red-300 text-red-700 hover:bg-red-50"
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
     </>
   );
