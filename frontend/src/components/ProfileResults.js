@@ -73,7 +73,7 @@ function ProfileResults({ searchQuery, onBackToSearch, onNavigate, onNewSearch }
 
     } catch (err) {
       console.error('[ProfileResults] Fetch error:', err)
-      setProfiles([])
+      // setProfiles([])
       setSearchResults(query, []) // Cache empty results to prevent repeated failures
     }
   }

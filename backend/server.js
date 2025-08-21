@@ -214,3 +214,12 @@ const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
   console.log(`Backend proxy listening on http://localhost:${PORT}`)
 })
+
+const path = require('path');  // Add this at the top with your other requires
+
+app.use(express.static(path.join(__dirname, 'frontend/build')));
+
+// Catch-all route for client-side routing (serve index.html for any unmatched GET requests)
+app.get('/*any', (req, res) => {
+  res.sendFile(path.join(__dirname, 'frontend/build', 'index.html'));
+});

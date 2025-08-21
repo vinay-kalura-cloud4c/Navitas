@@ -310,7 +310,7 @@ const SavedProfileListItem = ({
         </div>
 
         {/* Email Checkbox */}
-        <div className="lg:col-span-1 flex flex-col items-center">
+        {/* <div className="lg:col-span-1 flex flex-col items-center">
           <label className="text-sm font-medium text-gray-700 mb-2 lg:hidden">Email</label>
           <input
             type="checkbox"
@@ -318,7 +318,7 @@ const SavedProfileListItem = ({
             onChange={(e) => onEmailChange(profile.id, e.target.checked)}
             className="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
           />
-        </div>
+        </div> */}
 
         {/* Email Address and Actions */}
         <div className="lg:col-span-2">
@@ -344,7 +344,7 @@ const SavedProfileListItem = ({
           </button>
 
           {/* Send Email Button with Auth Check */}
-          <button
+          {/* <button
             onClick={sendEmail}
             disabled={!emailAddress}
             className={`w-full px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${!isAuthenticated
@@ -353,7 +353,7 @@ const SavedProfileListItem = ({
               } ${!emailAddress ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             {!isAuthenticated ? '🔒 Send Email (Login Required)' : 'Send Email'}
-          </button>
+          </button> */}
         </div>
 
         {/* Send Invitation Checkbox */}
@@ -381,8 +381,8 @@ const SavedProfileListItem = ({
             onClick={scheduleMeeting}
             disabled={meetingLoading || !selectedDateTime}
             className={`w-full px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 ${!isAuthenticated
-                ? 'text-green-700 bg-green-50 border border-green-300 hover:bg-green-100'
-                : 'text-white bg-green-600 hover:bg-green-700'
+              ? 'text-green-700 bg-green-50 border border-green-300 hover:bg-green-100'
+              : 'text-white bg-green-600 hover:bg-green-700'
               } ${(!selectedDateTime || meetingLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             {meetingLoading ? 'Scheduling...' : !isAuthenticated ? '🔒 Schedule (Login Required)' : 'Schedule Meeting'}
@@ -395,8 +395,8 @@ const SavedProfileListItem = ({
           <button
             onClick={handleTranscriptClick}
             className={`px-3 py-2 text-sm font-medium border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${!isAuthenticated
-                ? 'text-blue-700 bg-blue-50 border-blue-300 hover:bg-blue-100'
-                : 'text-blue-700 bg-blue-50 border-blue-300 hover:bg-blue-100'
+              ? 'text-blue-700 bg-blue-50 border-blue-300 hover:bg-blue-100'
+              : 'text-blue-700 bg-blue-50 border-blue-300 hover:bg-blue-100'
               }`}
           >
             {!isAuthenticated ? '🔒 Transcript' : 'Transcript'}
