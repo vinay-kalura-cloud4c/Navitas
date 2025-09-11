@@ -1,6 +1,7 @@
 // AuthenticationHeader.tsx
 import React, { useState, useEffect } from 'react';
 import { PublicClientApplication } from '@azure/msal-browser';
+import AuthService from './AuthService';
 
 // MSAL Configuration
 const msalConfig = {
@@ -27,7 +28,7 @@ const loginRequest = {
 };
 
 const msalInstance = new PublicClientApplication(msalConfig);
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://127.0.0.1:8000';
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL_DEV || 'https://127.0.0.1:8000';
 
 const AuthenticationHeader = ({ onAuthChange }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -109,47 +110,51 @@ const AuthenticationHeader = ({ onAuthChange }) => {
         return response;
     };
 
-    const handleLogin = async () => {
-        if (!msalInitialized) {
-            alert('Authentication system is still loading. Please try again in a moment.');
-            return;
-        }
+    // const handleLogin = async () => {
+    //     if (!msalInitialized) {
+    //         alert('Authentication system is still loading. Please try again in a moment.');
+    //         return;
+    //     }
 
-        setAuthLoading(true);
-        try {
-            const loginResponse = await msalInstance.loginPopup(loginRequest);
-            const accessToken = loginResponse.accessToken;
+    //     setAuthLoading(true);
+    //     try {
+    //         const loginResponse = await msalInstance.loginPopup(loginRequest);
+    //         const accessToken = loginResponse.accessToken;
 
-            await sendTokenToBackend(accessToken);
-            setIsAuthenticated(true);
-            setUserInfo(loginResponse.account);
-            console.log('Authentication successful');
+    //         await sendTokenToBackend(accessToken);
+    //         setIsAuthenticated(true);
+    //         setUserInfo(loginResponse.account);
+    //         console.log('Authentication successful');
 
-        } catch (error) {
-            console.error('Login failed:', error);
-            alert('Authentication failed. Please try again.');
-        } finally {
-            setAuthLoading(false);
-        }
-    };
+    //     } catch (error) {
+    //         console.error('Login failed:', error);
+    //         alert('Authentication failed. Please try again.');
+    //     } finally {
+    //         setAuthLoading(false);
+    //     }
+    // };
 
-    const handleLogout = async () => {
-        if (!msalInitialized) return;
+    // const handleLogout = async () => {
+    //     if (!msalInitialized) return;
 
-        try {
-            const accounts = msalInstance.getAllAccounts();
-            if (accounts.length > 0) {
-                await msalInstance.logoutPopup({
-                    account: accounts[0]
-                });
-            }
+    //     try {
+    //         const accounts = msalInstance.getAllAccounts();
+    //         if (accounts.length > 0) {
+    //             await msalInstance.logoutPopup({
+    //                 account: accounts[0]
+    //             });
+    //         }
 
-            await fetch(`${BACKEND_URL}/logout`, { method: 'POST' });
-            setIsAuthenticated(false);
-            setUserInfo(null);
-        } catch (error) {
-            console.error('Logout failed:', error);
-        }
+    //         await fetch(`${BACKEND_URL}/logout`, { method: 'POST' });
+    //         setIsAuthenticated(false);
+    //         setUserInfo(null);
+    //     } catch (error) {
+    //         console.error('Logout failed:', error);
+    //     }
+    // };
+
+    const handleLogin = () => {
+        AuthService.initiateLogin();
     };
 
     return (
@@ -164,7 +169,7 @@ const AuthenticationHeader = ({ onAuthChange }) => {
                         {/* Authentication Status */}
                         <div className="flex items-center space-x-2">
                             <div className={`w-2 h-2 rounded-full ${!msalInitialized ? 'bg-yellow-500' :
-                                    isAuthenticated ? 'bg-green-500' : 'bg-red-500'
+                                isAuthenticated ? 'bg-green-500' : 'bg-red-500'
                                 }`}></div>
                             <span className="text-sm font-medium text-gray-700">
                                 {!msalInitialized ? 'Initializing...' :

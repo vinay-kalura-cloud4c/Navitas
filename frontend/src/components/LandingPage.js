@@ -1,17 +1,78 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback, useRef } from 'react'
 import InputWithButton from './comp-22'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/Card'
-import { StarsBackground } from './core/backgrounds/stars'  // <-- import the stars bg
+import { StarsBackground } from './core/backgrounds/stars'
 import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar"
 import { IconHome, IconBookmark, IconSearch } from "@tabler/icons-react"
+import useStore from '../store/useStore'
 
 export default function LandingPage({ onSearch, onNavigate }) {
   const [searchQuery, setSearchQuery] = useState('')
+  const setProfiles = useStore(state => state.setProfiles) // ✅ Correct way to access setProfiles
+  const [loading, setLoading] = useState(false)
+  const isSearchingRef = useRef(false)
 
-  const handleSubmit = (e) => {
+  const searchProfiles = useCallback(async (query) => {
+    if (isSearchingRef.current || loading) {
+      console.log('Search already in progress, skipping...')
+      return
+    }
+
+    isSearchingRef.current = true
+    setLoading(true)
+
+    try {
+      console.log('Making API call with query:', query)
+
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL_DEV}/match`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          "job_description": query,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log('API response received:', data)
+
+      // Map the API response to the expected format for your ProfileResults component
+      const mappedProfiles = (data.top_profiles || []).map((profile, index) => ({
+        id: index,
+        name: profile.title || profile.name || 'Unknown',
+        short_summary: profile.snippet || profile.short_summary || '',
+        full_summary: profile.snippet || profile.full_summary || '',
+        link: profile.link || '',
+        score: profile.score || 0,
+        platform: profile.platform || 'LinkedIn',
+      }))
+
+      setProfiles(mappedProfiles) // Now this will work correctly
+
+      // Pass the search query to navigate to results
+      onSearch(query)
+
+    } catch (error) {
+      console.error('Error searching profiles:', error)
+      alert('Failed to search profiles. Please try again.')
+    } finally {
+      setLoading(false)
+      isSearchingRef.current = false
+    }
+  }, [onSearch, loading, setProfiles]) // Added setProfiles to dependencies
+
+  const handleSubmit = useCallback((e) => {
     e.preventDefault()
-    onSearch(searchQuery)
-  }
+    if (searchQuery.trim() && !loading) {
+      searchProfiles(searchQuery)
+    }
+  }, [searchQuery, loading, searchProfiles])
 
   const links = [
     {
@@ -35,17 +96,16 @@ export default function LandingPage({ onSearch, onNavigate }) {
   ]
 
   return (
-    <div className="h-screen flex overflow-hidden">
+    <div className="h-screen flex">
       <Sidebar>
         <SidebarBody className="justify-between gap-10">
           <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-            {/* Logo/Title Section */}
             <div className="flex px-4 py-4">
               <div className="text-lg font-semibold text-neutral-800 dark:text-neutral-200">
                 AX UI
               </div>
             </div>
-            
+
             <div className="mt-8 flex flex-col gap-2">
               {links.map((link, idx) => (
                 <div key={idx} onClick={link.onClick} className="cursor-pointer">
@@ -59,23 +119,21 @@ export default function LandingPage({ onSearch, onNavigate }) {
 
       <div className="flex-1 overflow-y-auto">
         <StarsBackground className="min-h-screen">
-          {/* overlay a semi-transparent container on top of the stars */}
           <div className="bg-black/40 flex flex-col items-center justify-start p-5 min-h-screen">
             <div className="max-w-4xl w-full text-center animate-fade-in py-8">
               <header className="mb-16 text-white mt-16">
                 <h1 className="text-5xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent drop-shadow-2xl">
-                  Talent Acquisition Platform
+                  Search. Select. Succeed
                 </h1>
-                <p className="text-xl md:text-2xl opacity-90 font-light">
-                  Discover Excellence
-                </p>
               </header>
 
               <form onSubmit={handleSubmit} className="max-w-2xl mx-auto mb-20 mt-24">
                 <Card className="p-2 bg-white/10 backdrop-blur-md border-white/20 shadow-2xl">
-                   <InputWithButton
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                  <InputWithButton
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    disabled={loading}
+                    placeholder={loading ? "Searching..." : "Enter search query"}
                   />
                 </Card>
               </form>
@@ -130,6 +188,14 @@ export default function LandingPage({ onSearch, onNavigate }) {
           </div>
         </StarsBackground>
       </div>
+      {loading && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white/20 backdrop-blur-md rounded-lg p-8 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+            <p className="text-white text-lg">Searching profiles...</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

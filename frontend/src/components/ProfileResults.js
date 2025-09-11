@@ -1,90 +1,16 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Button } from './ui/Button'
 import ExpandableCardDemo from "./expandable-card-demo-standard";
-import { AnimatePresence, motion } from 'motion/react'
 import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar"
-import { IconHome, IconBookmark, IconSearch, IconRefresh } from "@tabler/icons-react"
-import { useSearchCache } from '../contexts/SearchCacheContext'
+import { IconHome, IconBookmark, IconSearch } from "@tabler/icons-react"
+import useStore from '../store/useStore' // ✅ Correct - default import
+
 
 function ProfileResults({ searchQuery, onBackToSearch, onNavigate, onNewSearch }) {
-  const [profiles, setProfiles] = useState([])
+  const profiles = useStore(state => state.profiles) // Get profiles directly from store
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedProfiles, setSelectedProfiles] = useState(new Set())
   const profilesPerPage = 9
-
-  const {
-    getCachedData,
-    isCacheValid,
-    isLoading,
-    setSearchResults,
-    setLoading,
-    invalidateCache
-  } = useSearchCache()
-
-  // Check if we have cached data on component mount
-  useEffect(() => {
-    if (!searchQuery) return
-
-    const cachedData = getCachedData(searchQuery)
-    if (cachedData) {
-      // Use cached data immediately
-      setProfiles(cachedData)
-      setCurrentPage(1)
-      console.log('[ProfileResults] Using cached data for:', searchQuery)
-    } else {
-      // Fetch fresh data
-      fetchSearchResults(searchQuery)
-    }
-  }, [searchQuery])
-
-  const fetchSearchResults = async (query) => {
-    if (!query) return
-
-    console.log('[ProfileResults] Fetching fresh data for:', query)
-    setLoading(query, true)
-
-    try {
-      const response = await fetch('/match', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ job_description: query })
-      })
-
-      if (!response.ok) throw new Error(response.status)
-
-      const data = await response.json()
-
-      // Map API fields to Profile interface
-      const mapped = (data.top_profiles || []).map((p, i) => ({
-        id: i,
-        name: p.title,
-        short_summary: p.snippet,
-        full_summary: `${p.snippet}`,
-        link: p.link,
-        score: p.score
-      }))
-
-      setProfiles(mapped)
-      setCurrentPage(1)
-      setSelectedProfiles(new Set()) // Clear selection when new data loads
-
-      // Cache the results
-      setSearchResults(query, mapped)
-
-    } catch (err) {
-      console.error('[ProfileResults] Fetch error:', err)
-      // setProfiles([])
-      setSearchResults(query, []) // Cache empty results to prevent repeated failures
-    }
-  }
-
-  const handleRefresh = () => {
-    if (searchQuery) {
-      invalidateCache(searchQuery)
-      setSelectedProfiles(new Set()) // Clear selection on refresh
-      fetchSearchResults(searchQuery)
-    }
-  }
 
   const handleProfileSelection = (profileId, isSelected) => {
     const newSelection = new Set(selectedProfiles)
@@ -144,11 +70,11 @@ function ProfileResults({ searchQuery, onBackToSearch, onNavigate, onNewSearch }
     setSelectedProfiles(new Set())
   }
 
-  const totalPages = Math.ceil(profiles.length / profilesPerPage);
+  const totalPages = Math.ceil(profiles.length / profilesPerPage)
   const currentProfiles = profiles.slice(
     (currentPage - 1) * profilesPerPage,
     currentPage * profilesPerPage
-  );
+  )
 
   const links = [
     {
@@ -171,7 +97,6 @@ function ProfileResults({ searchQuery, onBackToSearch, onNavigate, onNewSearch }
     }
   ]
 
-  const loading = isLoading(searchQuery)
   const currentPageSelectedCount = currentProfiles.filter(profile => selectedProfiles.has(profile.id)).length
   const allCurrentPageSelected = currentPageSelectedCount === currentProfiles.length && currentProfiles.length > 0
 
@@ -209,83 +134,59 @@ function ProfileResults({ searchQuery, onBackToSearch, onNavigate, onNewSearch }
               >
                 ← Back to Search
               </Button>
-              <Button
-                onClick={handleRefresh}
-                variant="outline"
-                className="bg-white hover:bg-slate-50 border-slate-300 flex items-center gap-2"
-                disabled={loading}
-              >
-                <IconRefresh className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
             </div>
             <h1 className="text-4xl font-bold text-slate-800 mb-4">
               Profile Results
             </h1>
-            {isCacheValid(searchQuery) && !loading && (
-              <p className="text-sm text-green-600 mb-2">
-                ✓ Showing cached results
-              </p>
-            )}
+            <p className="text-lg text-slate-600">
+              Search: "{searchQuery}"
+            </p>
           </header>
 
-          {loading ? (
-            <div className="flex items-center justify-center my-12">
-              <svg
-                className="animate-spin h-12 w-12 text-gray-500"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
+          <div className="flex justify-between items-center mb-6">
+            <p className="text-lg text-slate-600">
+              {profiles.length} profiles found
+            </p>
+
+            {/* Selection Controls */}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={allCurrentPageSelected}
+                  onChange={handleSelectAll}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  disabled={currentProfiles.length === 0}
+                />
+                <span className="text-sm text-slate-600">
+                  Select all on page ({currentPageSelectedCount}/{currentProfiles.length})
+                </span>
+              </div>
+
+              {selectedProfiles.size > 0 && (
+                <Button
+                  onClick={handleSaveSelectedProfiles}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  Save Selected ({selectedProfiles.size})
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {profiles.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-xl text-slate-600">No profiles found for this search.</p>
+              <Button
+                onClick={onNewSearch}
+                className="mt-4"
               >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                />
-              </svg>
+                Try a new search
+              </Button>
             </div>
           ) : (
             <>
-              <div className="flex justify-between items-center mb-6">
-                <p className="text-lg text-slate-600">
-                  {profiles.length} profiles found
-                </p>
-
-                {/* Selection Controls */}
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={allCurrentPageSelected}
-                      onChange={handleSelectAll}
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      disabled={currentProfiles.length === 0}
-                    />
-                    <span className="text-sm text-slate-600">
-                      Select all on page ({currentPageSelectedCount}/{currentProfiles.length})
-                    </span>
-                  </div>
-
-                  {selectedProfiles.size > 0 && (
-                    <Button
-                      onClick={handleSaveSelectedProfiles}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      Save Selected ({selectedProfiles.size})
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              {/* Feed the mapped cards into the demo component */}
+              {/* Render profiles */}
               <ExpandableCardDemo
                 cards={currentProfiles}
                 selectedProfiles={selectedProfiles}
