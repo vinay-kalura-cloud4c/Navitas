@@ -223,7 +223,6 @@ function SavedProfiles({ onNavigate, onNewSearch, hasSearchResults }) {
             startTime = new Date(profile.meetingDateTime)
           }
 
-          // Prepare the API payload for this profile
           const payload = {
             subject: `${meetingSubject.trim()} - ${profile.name}`,
             attendees: attendeeEmails,
@@ -247,7 +246,6 @@ function SavedProfiles({ onNavigate, onNewSearch, hasSearchResults }) {
           const result = await response.json()
           console.log(`Meeting scheduled successfully for ${profile.name}:`, result)
 
-          // Update status to "Invite Sent" after successful meeting scheduling
           setProfileStatuses(prev => ({
             ...prev,
             [profile.id]: 'Invite Sent'
@@ -271,11 +269,9 @@ function SavedProfiles({ onNavigate, onNewSearch, hasSearchResults }) {
         }
       }
 
-      // Show summary results
       if (successCount > 0) {
         alert(`Successfully scheduled ${successCount} meeting(s)!${errorCount > 0 ? ` ${errorCount} failed.` : ''}`)
 
-        // Reset form after successful submissions
         setEmailSelections({})
         setInvitationSelections({})
         setEmailAddresses({})
