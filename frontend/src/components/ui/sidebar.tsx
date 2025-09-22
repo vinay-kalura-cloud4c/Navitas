@@ -76,6 +76,7 @@ export const SidebarBody = (props: React.ComponentProps<typeof motion.div>) => {
   return (
     <>
       <DesktopSidebar {...props} />
+      {/* Comment out or remove the mobile sidebar */}
       {/* <MobileSidebar {...(props as React.ComponentProps<"div">)} /> */}
     </>
   );
@@ -91,7 +92,7 @@ export const DesktopSidebar = ({
     <>
       <motion.div
         className={cn(
-          "h-full px-4 py-4 hidden  md:flex md:flex-col bg-neutral-100 dark:bg-neutral-800 w-[300px] shrink-0",
+          "h-full px-4 py-4 hidden md:flex md:flex-col bg-neutral-100 dark:bg-neutral-800 w-[300px] shrink-0",
           className
         )}
         animate={{
@@ -107,6 +108,7 @@ export const DesktopSidebar = ({
   );
 };
 
+// Keep mobile sidebar but make sure it's only rendered when needed
 export const MobileSidebar = ({
   className,
   children,
@@ -117,7 +119,7 @@ export const MobileSidebar = ({
     <>
       <div
         className={cn(
-          "h-10 px-4 py-4 flex flex-row md:hidden  items-center justify-between bg-neutral-100 dark:bg-neutral-800 w-full"
+          "h-10 px-4 py-4 flex flex-row md:hidden items-center justify-between bg-neutral-100 dark:bg-neutral-800 w-full"
         )}
         {...props}
       >
@@ -160,32 +162,50 @@ export const MobileSidebar = ({
 export const SidebarLink = ({
   link,
   className,
+  onClick,
+  isActive,
   ...props
 }: {
   link: Links;
   className?: string;
+  onClick?: () => void;
+  isActive?: boolean;
 }) => {
   const { open, animate } = useSidebar();
+
   return (
-    <a
-      href={link.href}
+    <div
+      onClick={onClick}
       className={cn(
-        "flex items-center justify-start gap-2  group/sidebar py-2",
+        "flex items-center justify-start gap-2 group/sidebar py-2 px-2 cursor-pointer rounded-md transition-all duration-150",
+        isActive
+          ? "bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 shadow-sm"
+          : "hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-200",
         className
       )}
       {...props}
     >
-      {link.icon}
+      <div className={cn(
+        "transition-transform duration-150",
+        isActive ? "scale-110" : "group-hover/sidebar:scale-105"
+      )}>
+        {link.icon}
+      </div>
 
       <motion.span
         animate={{
           display: animate ? (open ? "inline-block" : "none") : "inline-block",
           opacity: animate ? (open ? 1 : 0) : 1,
         }}
-        className="text-neutral-700 dark:text-neutral-200 text-sm group-hover/sidebar:translate-x-1 transition duration-150 whitespace-pre inline-block !p-0 !m-0"
+        className={cn(
+          "text-sm group-hover/sidebar:translate-x-1 transition duration-150 whitespace-pre inline-block !p-0 !m-0 font-medium",
+          isActive
+            ? "text-blue-600 dark:text-blue-400"
+            : "text-neutral-700 dark:text-neutral-200"
+        )}
       >
         {link.label}
       </motion.span>
-    </a>
+    </div>
   );
 };

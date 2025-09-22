@@ -11,7 +11,7 @@ const LoginPage = () => {
         <div className="login-container">
             <div className="login-card">
                 <div className="login-header">
-                    <h1>Welcome to Rainbow Px</h1>
+                    <h1>Welcome to Talent Acquisition</h1>
                     <p>Your profile discovery platform</p>
                 </div>
 
@@ -33,18 +33,16 @@ const LoginPage = () => {
                     <h2>Sign in to continue</h2>
                     <p className="login-subtitle">Access your profile discovery dashboard</p>
 
-                    <button
-                        className="login-button"
-                        onClick={handleLogin}
-                    >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M23.766 12.276c0-.815-.07-1.605-.2-2.357H12.24v4.456h6.487c-.278 1.496-1.125 2.764-2.397 3.616v3.001h3.878c2.27-2.089 3.578-5.166 3.578-8.716z" fill="#4285F4" />
-                            <path d="M12.24 24c3.24 0 5.956-1.075 7.942-2.907l-3.878-3.002c-1.075.722-2.45 1.148-4.064 1.148-3.125 0-5.768-2.11-6.714-4.948H1.54v3.098C3.518 21.344 7.612 24 12.24 24z" fill="#34A853" />
-                            <path d="M5.526 14.291c-.243-.722-.381-1.49-.381-2.291s.138-1.569.381-2.291V6.611H1.54C.561 8.569 0 10.235 0 12s.561 3.431 1.54 5.389l3.986-3.098z" fill="#FBBC05" />
-                            <path d="M12.24 4.758c1.764 0 3.347.605 4.595 1.792l3.447-3.448C18.19 1.19 15.474 0 12.24 0 7.612 0 3.518 2.656 1.54 6.611l3.986 3.097c.946-2.838 3.589-4.95 6.714-4.95z" fill="#EA4335" />
+                    <button className="login-button" onClick={handleLogin}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 23 23">
+                            <rect x="1" y="1" width="10" height="10" fill="#F25022" />
+                            <rect x="12" y="1" width="10" height="10" fill="#7FBA00" />
+                            <rect x="1" y="12" width="10" height="10" fill="#00A4EF" />
+                            <rect x="12" y="12" width="10" height="10" fill="#FFB900" />
                         </svg>
                         Continue with Microsoft
                     </button>
+
                 </div>
 
                 <div className="login-footer">

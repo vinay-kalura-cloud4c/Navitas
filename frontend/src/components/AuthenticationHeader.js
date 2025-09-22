@@ -28,7 +28,7 @@ const loginRequest = {
 };
 
 const msalInstance = new PublicClientApplication(msalConfig);
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL_DEV || 'https://127.0.0.1:8000';
+const BACKEND_URL = 'http://localhost:8000';
 
 const AuthenticationHeader = ({ onAuthChange }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);

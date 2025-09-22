@@ -2,7 +2,7 @@
 class AuthService {
     async initiateLogin() {
         try {
-            const response = await fetch('https://localhost:8000/auth/login', {
+            const response = await fetch('http://localhost:8000/auth/login', {
                 credentials: 'include'
             });
 
@@ -18,7 +18,7 @@ class AuthService {
 
     async getCurrentUser() {
         try {
-            const response = await fetch('https://localhost:8000/auth/user', {
+            const response = await fetch('http://localhost:8000/auth/user', {
                 credentials: 'include'
             });
 
@@ -35,7 +35,7 @@ class AuthService {
 
     async logout() {
         try {
-            await fetch('https://localhost:8000/auth/logout', {
+            await fetch('http://localhost:8000/auth/logout', {
                 method: 'POST',
                 credentials: 'include'
             });

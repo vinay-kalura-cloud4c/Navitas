@@ -26,6 +26,27 @@ const SavedProfileListItem = ({
   const [showTranscript, setShowTranscript] = useState(false);
   const [currentTranscript, setCurrentTranscript] = useState('');
   const [aiSummary, setAiSummary] = useState('');
+  const [questionsLoaded, setQuestionsLoaded] = useState(false);
+  const [questionsError, setQuestionsError] = useState(null);
+
+  // Auto-load questions when component mounts
+  useEffect(() => {
+    const loadQuestionsOnMount = async () => {
+      // Check if questions are already cached
+      const savedQuestions = JSON.parse(localStorage.getItem('interviewQuestions') || '{}');
+
+      if (savedQuestions[profile.id]) {
+        // Questions already exist, mark as loaded
+        setQuestionsLoaded(true);
+        return;
+      }
+
+      // No cached questions, generate them automatically
+      await generateInterviewQuestions();
+    };
+
+    loadQuestionsOnMount();
+  }, [profile.id]); // Only run when profile.id changes
 
   const secureApiCall = async (url, options = {}) => {
     const response = await fetch(url, {
@@ -59,22 +80,34 @@ const SavedProfileListItem = ({
     }
   };
 
-  // Generate interview questions (doesn't require authentication)
+  // Generate interview questions (auto-called on mount)
   const generateInterviewQuestions = async () => {
     setLoading(true);
+    setQuestionsError(null);
+
     try {
-      const response = await fetch(`${BACKEND_URL}/generate-questions`, {
+      // Get the job description from selectedSearchHistory in the Zustand store
+      const { selectedSearchHistory } = useStore.getState();
+
+      // Extract job description from selectedSearchHistory or provide a fallback
+      const jobDescription = selectedSearchHistory?.job_description ||
+        selectedSearchHistory?.search_query ||
+        "General interview for the position";
+
+      const response = await fetch(`${BACKEND_URL}/api/generate-questions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          job_description: profile.job_description,
-          profile_summary: profile.full_summary
+          job_description: jobDescription,
+          profile_summary: profile.full_summary || profile.short_summary || profile.name
         })
       });
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('API Error:', errorData);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
@@ -88,11 +121,14 @@ const SavedProfileListItem = ({
 
       savedQuestions[profile.id] = questionsToStore;
       localStorage.setItem('interviewQuestions', JSON.stringify(savedQuestions));
-      setShowQuestions(true);
+
+      setQuestionsLoaded(true);
+      console.log(`Questions auto-loaded for ${profile.name}`);
 
     } catch (error) {
       console.error('Error generating interview questions:', error);
-      alert('Failed to generate interview questions. Please try again.');
+      setQuestionsError(error.message);
+      // Don't show alert for auto-loading failures, just log the error
     } finally {
       setLoading(false);
     }
@@ -118,10 +154,10 @@ const SavedProfileListItem = ({
     try {
       const meetingData = {
         organizer_email: "vinay.kalura@cloud4c.com",
-        subject: meetingSubject || `Interview for ${profile.name}`, // Use store value or fallback
-        attendees: ["vinay.kalura@cloud4c.com"], // Start with organizer email
+        subject: meetingSubject || `Interview for ${profile.name}`,
+        attendees: ["vinay.kalura@cloud4c.com"],
         start_time: selectedDateTime,
-        duration_minutes: durationMinutes || 60 // Use store value or fallback
+        duration_minutes: durationMinutes || 60
       };
 
       // Add additional email if provided
@@ -224,12 +260,18 @@ const SavedProfileListItem = ({
     }
 
     try {
+      // Get job description from Zustand store for transcript analysis
+      const { selectedSearchHistory } = useStore.getState();
+      const jobDescription = selectedSearchHistory?.job_description ||
+        selectedSearchHistory?.search_query ||
+        "General interview position";
+
       const response = await secureApiCall(`${BACKEND_URL}/get-transcription`, {
         method: 'POST',
         body: JSON.stringify({
           organizer: "me",
           id: meetingId,
-          job_description: profile.job_description,
+          job_description: jobDescription,
         })
       });
 
@@ -281,6 +323,16 @@ const SavedProfileListItem = ({
 
   const hasStoredQuestions = !!getStoredQuestions();
 
+  // Get questions status for display
+  const getQuestionsStatus = () => {
+    if (loading) return { text: 'Loading Questions...', color: 'bg-yellow-500 text-white', disabled: true };
+    if (questionsError) return { text: 'Questions Failed', color: 'bg-red-500 text-white', disabled: false };
+    if (questionsLoaded || hasStoredQuestions) return { text: 'View Questions', color: 'bg-green-600 hover:bg-green-700 text-white', disabled: false };
+    return { text: 'Questions Loading...', color: 'bg-gray-400 text-white', disabled: true };
+  };
+
+  const questionsStatus = getQuestionsStatus();
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6 mb-4 border border-gray-200">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
@@ -289,23 +341,25 @@ const SavedProfileListItem = ({
             {profile.name}
           </h3>
           <p className="text-gray-600 text-sm mb-3 overflow-hidden">
-            {profile.full_summary.length > 120
-              ? `${profile.full_summary.substring(0, 120)}...`
-              : profile.full_summary
+            {(profile.full_summary || profile.short_summary || '').length > 120
+              ? `${(profile.full_summary || profile.short_summary || '').substring(0, 120)}...`
+              : (profile.full_summary || profile.short_summary || 'No summary available')
             }
           </p>
           <div className="flex items-center gap-4 text-sm text-gray-500">
             <span className="bg-gray-100 px-2 py-1 rounded">
-              Score: {profile.score}
+              Score: {profile.score || 'N/A'}
             </span>
-            <a
-              href={profile.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800 underline"
-            >
-              View Profile
-            </a>
+            {profile.link && (
+              <a
+                href={profile.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-800 underline"
+              >
+                View Profile
+              </a>
+            )}
           </div>
         </div>
 
@@ -321,6 +375,7 @@ const SavedProfileListItem = ({
             <option value="Awaiting Result">Awaiting Result</option>
           </select>
         </div>
+
         <div className="lg:col-span-2">
           <label className="text-sm font-medium text-gray-700 mb-2 block lg:hidden">Email Address</label>
           <input
@@ -331,17 +386,29 @@ const SavedProfileListItem = ({
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm mb-2"
           />
 
-          {/* Questions Button */}
+          {/* Auto-loaded Questions Button */}
           <button
-            onClick={hasStoredQuestions ? () => setShowQuestions(true) : generateInterviewQuestions}
-            disabled={loading}
-            className={`w-full mb-2 px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${hasStoredQuestions
-              ? 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 text-white'
-              : 'bg-green-600 hover:bg-green-700 focus:ring-green-500 text-white'
-              }`}
+            onClick={() => {
+              if (questionsError) {
+                // Retry loading questions if there was an error
+                generateInterviewQuestions();
+              } else if (questionsLoaded || hasStoredQuestions) {
+                // Show questions if they're loaded
+                setShowQuestions(true);
+              }
+            }}
+            disabled={questionsStatus.disabled}
+            className={`w-full mb-2 px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${questionsStatus.color}`}
           >
-            {loading ? 'Generating...' : hasStoredQuestions ? 'Display Questions' : 'Generate Questions'}
+            {questionsStatus.text}
           </button>
+
+          {/* Optional error message */}
+          {questionsError && (
+            <p className="text-xs text-red-600 mt-1">
+              Click to retry loading questions
+            </p>
+          )}
         </div>
 
         <div className="lg:col-span-1 flex flex-col items-center">

@@ -8,7 +8,8 @@ import useStore from '../store/useStore'
 
 export default function LandingPage({ onSearch, onNavigate }) {
   const [searchQuery, setSearchQuery] = useState('')
-  const setProfiles = useStore(state => state.setProfiles) // ✅ Correct way to access setProfiles
+  const setProfiles = useStore(state => state.setProfiles)
+  const setSelectedSearchHistory = useStore(state => state.setSelectedSearchHistory)
   const [loading, setLoading] = useState(false)
   const isSearchingRef = useRef(false)
 
@@ -24,7 +25,7 @@ export default function LandingPage({ onSearch, onNavigate }) {
     try {
       console.log('Making API call with query:', query)
 
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL_DEV}/match`, {
+      const response = await fetch(`http://localhost:8000/api/match`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -42,7 +43,6 @@ export default function LandingPage({ onSearch, onNavigate }) {
       const data = await response.json()
       console.log('API response received:', data)
 
-      // Map the API response to the expected format for your ProfileResults component
       const mappedProfiles = (data.top_profiles || []).map((profile, index) => ({
         id: index,
         name: profile.title || profile.name || 'Unknown',
@@ -53,9 +53,12 @@ export default function LandingPage({ onSearch, onNavigate }) {
         platform: profile.platform || 'LinkedIn',
       }))
 
-      setProfiles(mappedProfiles) // Now this will work correctly
-
-      // Pass the search query to navigate to results
+      setProfiles(mappedProfiles)
+      setSelectedSearchHistory({
+        search_id: data.search_id,          // take from backend response
+        job_description: query,
+        top_profiles: mappedProfiles
+      })
       onSearch(query)
 
     } catch (error) {
@@ -65,7 +68,7 @@ export default function LandingPage({ onSearch, onNavigate }) {
       setLoading(false)
       isSearchingRef.current = false
     }
-  }, [onSearch, loading, setProfiles]) // Added setProfiles to dependencies
+  }, [onSearch, loading, setProfiles])
 
   const handleSubmit = useCallback((e) => {
     e.preventDefault()
@@ -97,8 +100,8 @@ export default function LandingPage({ onSearch, onNavigate }) {
 
   return (
     <div className="h-screen flex">
-      <Sidebar>
-        <SidebarBody className="justify-between gap-10">
+      {/* <Sidebar> */}
+      {/* <SidebarBody className="justify-between gap-10">
           <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
             <div className="flex px-4 py-4">
               <div className="text-lg font-semibold text-neutral-800 dark:text-neutral-200">
@@ -114,8 +117,8 @@ export default function LandingPage({ onSearch, onNavigate }) {
               ))}
             </div>
           </div>
-        </SidebarBody>
-      </Sidebar>
+        </SidebarBody> */}
+      {/* </Sidebar> */}
 
       <div className="flex-1 overflow-y-auto">
         <StarsBackground className="min-h-screen">
@@ -131,14 +134,14 @@ export default function LandingPage({ onSearch, onNavigate }) {
                 <Card className="p-2 bg-white/10 backdrop-blur-md border-white/20 shadow-2xl">
                   <InputWithButton
                     value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
+                    onChange={setSearchQuery} // Simplified - just pass the setter
                     disabled={loading}
-                    placeholder={loading ? "Searching..." : "Enter search query"}
+                    placeholder={loading ? "Searching..." : "Accepts Boolean/X-Ray search or Job Description"}
                   />
                 </Card>
               </form>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-slide-up">
+              {/* <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-slide-up">
                 <Card className="bg-white/10 backdrop-blur-md border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 hover:shadow-2xl group">
                   <CardHeader className="text-center">
                     <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">🔍</div>
@@ -172,7 +175,7 @@ export default function LandingPage({ onSearch, onNavigate }) {
                     </CardDescription>
                   </CardContent>
                 </Card>
-              </div>
+              </div> */}
 
               <footer className="mt-12 w-full text-right text-white/80">
                 <a

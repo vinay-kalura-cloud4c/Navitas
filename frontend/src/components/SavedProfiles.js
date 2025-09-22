@@ -8,17 +8,46 @@ import { useSearchCache } from '../contexts/SearchCacheContext'
 import useStore from '../store/useStore'
 
 function SavedProfiles({ onNavigate, onNewSearch, hasSearchResults }) {
-
   const {
     meetingSubject,
     durationMinutes,
     additionalEmail,
     setMeetingSubject,
     setDurationMinutes,
-    setAdditionalEmail
+    setAdditionalEmail,
+    selectedSearchHistory // Get selected search history from Zustand store
   } = useStore();
 
-  const [savedProfiles, setSavedProfiles] = useState([])
+  // Parse shortlisted candidates from selectedSearchHistory
+  const getShortlistedProfiles = () => {
+    if (!selectedSearchHistory?.shortlisted_candidates) {
+      return [];
+    }
+
+    try {
+      // Parse the JSON string to get the shortlisted candidates array
+      const shortlistedData = JSON.parse(selectedSearchHistory.shortlisted_candidates);
+
+      // Transform the data to match the expected profile format
+      return shortlistedData.map((candidate, index) => ({
+        id: `${selectedSearchHistory.search_id}_shortlisted_${index}`,
+        name: candidate.name || candidate.title?.split(' - ')[0] || 'Unknown',
+        short_summary: candidate.short_summary || candidate.snippet || '',
+        full_summary: candidate.full_summary || candidate.snippet || '',
+        link: candidate.link || candidate.profile_url || '#',
+        score: candidate.score || 0,
+        platform: candidate.platform || 'default',
+        search_id: selectedSearchHistory.search_id
+      }));
+    } catch (error) {
+      console.error('Failed to parse shortlisted candidates:', error);
+      return [];
+    }
+  };
+
+  // Use shortlisted profiles as savedProfiles
+  const savedProfiles = getShortlistedProfiles();
+
   const [emailSelections, setEmailSelections] = useState({})
   const [invitationSelections, setInvitationSelections] = useState({})
   const [dateTimes, setDateTimes] = useState({})
@@ -33,26 +62,33 @@ function SavedProfiles({ onNavigate, onNewSearch, hasSearchResults }) {
   const { currentQuery, isCacheValid } = useSearchCache()
 
   useEffect(() => {
-    // Load saved profiles from localStorage
-    const saved = localStorage.getItem('savedProfiles')
-    if (saved) {
-      const profiles = JSON.parse(saved)
-      setSavedProfiles(profiles)
-
+    // Initialize states when profiles change
+    if (savedProfiles.length > 0) {
       // Initialize default date-times for each profile (1 hour from now)
       const defaultDateTime = new Date()
       defaultDateTime.setHours(defaultDateTime.getHours() + 1)
       const initialDateTimes = {}
       const initialStatuses = {}
-      profiles.forEach(profile => {
-        initialDateTimes[profile.id] = defaultDateTime.toISOString()
-        // Initialize with "Under Review" status
-        initialStatuses[profile.id] = 'Under Review'
+
+      savedProfiles.forEach(profile => {
+        // Only initialize if not already set
+        if (!dateTimes[profile.id]) {
+          initialDateTimes[profile.id] = defaultDateTime.toISOString()
+        }
+        if (!profileStatuses[profile.id]) {
+          initialStatuses[profile.id] = 'Under Review'
+        }
       })
-      setDateTimes(initialDateTimes)
-      setProfileStatuses(initialStatuses)
+
+      // Only update if there are new profiles
+      if (Object.keys(initialDateTimes).length > 0) {
+        setDateTimes(prev => ({ ...prev, ...initialDateTimes }))
+      }
+      if (Object.keys(initialStatuses).length > 0) {
+        setProfileStatuses(prev => ({ ...prev, ...initialStatuses }))
+      }
     }
-  }, [])
+  }, [savedProfiles.length]) // Depend on savedProfiles length to avoid infinite re-renders
 
   // ✅ Handle authentication changes
   const handleAuthChange = (authenticated) => {
@@ -68,8 +104,8 @@ function SavedProfiles({ onNavigate, onNewSearch, hasSearchResults }) {
   }
 
   const clearAllSaved = () => {
-    localStorage.removeItem('savedProfiles')
-    setSavedProfiles([])
+    // Since we're dealing with shortlisted candidates from search history,
+    // we'll just clear the local selections and navigate back
     setEmailSelections({})
     setInvitationSelections({})
     setDateTimes({})
@@ -79,14 +115,14 @@ function SavedProfiles({ onNavigate, onNewSearch, hasSearchResults }) {
     setDurationMinutes(30)
     setAdditionalEmail('')
     setTranscriptPopup({ visible: false, profileId: null })
+
+    // Navigate back to dashboard
+    onNavigate('dashboard')
   }
 
   const removeSavedProfile = (profileId) => {
-    const updated = savedProfiles.filter(p => p.id !== profileId)
-    setSavedProfiles(updated)
-    localStorage.setItem('savedProfiles', JSON.stringify(updated))
-
-    // Clean up associated selections and date-times
+    // For shortlisted candidates, we'll just update the local selections
+    // since we can't modify the original search history data
     const newEmailSelections = { ...emailSelections }
     const newInvitationSelections = { ...invitationSelections }
     const newDateTimes = { ...dateTimes }
@@ -149,6 +185,7 @@ function SavedProfiles({ onNavigate, onNewSearch, hasSearchResults }) {
     setTranscriptPopup({ visible: false, profileId: null })
   }
 
+  // Keep your existing handleSubmit function as is
   const handleSubmit = async () => {
     // ✅ Add authentication check for bulk scheduling
     if (!isAuthenticated) {
@@ -162,10 +199,13 @@ function SavedProfiles({ onNavigate, onNewSearch, hasSearchResults }) {
       return
     }
 
-    // Prepare data for submission
-    const selectedProfiles = savedProfiles.filter(profile =>
+    // Filter out profiles that were "removed" by checking if they still have any data
+    const availableProfiles = savedProfiles.filter(profile =>
       emailSelections[profile.id] || invitationSelections[profile.id]
-    ).map(profile => ({
+    );
+
+    // Prepare data for submission
+    const selectedProfiles = availableProfiles.map(profile => ({
       ...profile,
       sendEmail: emailSelections[profile.id] || false,
       sendInvitation: invitationSelections[profile.id] || false,
@@ -313,41 +353,28 @@ function SavedProfiles({ onNavigate, onNewSearch, hasSearchResults }) {
     }
   ]
 
+  // Get the page title and description
+  const isShortlistedView = selectedSearchHistory?.search_id && selectedSearchHistory?.shortlisted_candidates;
+  const pageTitle = isShortlistedView
+    ? `Shortlisted Candidates - ${selectedSearchHistory.job_description || 'Search Results'}`
+    : 'Saved Profiles';
+  const pageDescription = isShortlistedView
+    ? `${savedProfiles.length} shortlisted candidates from your search`
+    : `${savedProfiles.length} saved profiles`;
+
   return (
     <div className="min-h-screen flex">
-      <Sidebar>
-        <SidebarBody className="justify-between gap-10">
-          <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-            {/* Logo/Title Section */}
-            <div className="flex px-4 py-4">
-              <div className="text-lg font-semibold text-neutral-800 dark:text-neutral-200">
-                AX UI
-              </div>
-            </div>
-
-            <div className="mt-8 flex flex-col gap-2">
-              {links.map((link, idx) => (
-                <div key={idx} onClick={link.onClick} className="cursor-pointer">
-                  <SidebarLink link={link} />
-                </div>
-              ))}
-            </div>
-          </div>
-        </SidebarBody>
-      </Sidebar>
-
       <div className="flex-1 bg-gradient-to-br from-slate-50 to-slate-100">
-        {/* ✅ Add Authentication Header */}
-        <AuthenticationHeader onAuthChange={handleAuthChange} />
+        {/* <AuthenticationHeader onAuthChange={handleAuthChange} /> */}
 
         <div className="p-6">
           <div className="max-w-7xl mx-auto">
             <header className="mb-8 text-center">
               <h1 className="text-4xl font-bold text-slate-800 mb-4">
-                Saved Profiles
+                {pageTitle}
               </h1>
               <p className="text-lg text-slate-600 mb-6">
-                {savedProfiles.length} saved profiles
+                {pageDescription}
               </p>
               {savedProfiles.length > 0 && (
                 <div className="flex justify-center gap-4 mb-6">
@@ -356,8 +383,17 @@ function SavedProfiles({ onNavigate, onNewSearch, hasSearchResults }) {
                     variant="outline"
                     className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700"
                   >
-                    Clear All Saved
+                    Clear All {isShortlistedView ? 'Selections' : 'Saved'}
                   </Button>
+                  {isShortlistedView && (
+                    <Button
+                      onClick={() => onNavigate('dashboard')}
+                      variant="outline"
+                      className="bg-blue-50 hover:bg-blue-100 border-blue-300 text-blue-700"
+                    >
+                      Back to Dashboard
+                    </Button>
+                  )}
                 </div>
               )}
             </header>
@@ -365,8 +401,14 @@ function SavedProfiles({ onNavigate, onNewSearch, hasSearchResults }) {
             {savedProfiles.length === 0 ? (
               <div className="text-center py-12">
                 <div className="text-6xl mb-4">📭</div>
-                <h2 className="text-2xl font-semibold text-slate-700 mb-2">No saved profiles yet</h2>
-                <p className="text-slate-500 mb-6">Start saving profiles from your search results!</p>
+                <h2 className="text-2xl font-semibold text-slate-700 mb-2">
+                  No {isShortlistedView ? 'shortlisted candidates' : 'saved profiles'} yet
+                </h2>
+                <p className="text-slate-500 mb-6">
+                  {isShortlistedView
+                    ? 'No candidates have been shortlisted for this search yet.'
+                    : 'Start saving profiles from your search results!'}
+                </p>
                 <Button
                   onClick={() => onNavigate('landing')}
                   className="bg-blue-600 hover:bg-blue-700"
@@ -376,7 +418,7 @@ function SavedProfiles({ onNavigate, onNewSearch, hasSearchResults }) {
               </div>
             ) : (
               <>
-                {/* Meeting Configuration Form */}
+                {/* Keep all your existing JSX for the meeting configuration, profile list, etc. */}
                 <div className="bg-white rounded-lg shadow-md p-6 mb-6">
                   <h3 className="text-xl font-semibold text-slate-800 mb-4">Meeting Configuration</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -442,26 +484,28 @@ function SavedProfiles({ onNavigate, onNewSearch, hasSearchResults }) {
 
                 {/* Profile List */}
                 <div className="space-y-4 mb-8">
-                  {savedProfiles.map((profile) => (
-                    <SavedProfileListItem
-                      key={profile.id}
-                      profile={profile}
-                      onRemove={removeSavedProfile}
-                      emailChecked={emailSelections[profile.id] || false}
-                      onEmailChange={handleEmailChange}
-                      invitationChecked={invitationSelections[profile.id] || false}
-                      onInvitationChange={handleInvitationChange}
-                      selectedDateTime={dateTimes[profile.id]}
-                      onDateTimeChange={handleDateTimeChange}
-                      emailAddress={emailAddresses[profile.id] || ''}
-                      onEmailAddressChange={handleEmailAddressChange}
-                      status={profileStatuses[profile.id] || 'Under Review'}
-                      onStatusChange={handleStatusChange}
-                      onTranscriptClick={handleTranscriptClick}
-                      isAuthenticated={isAuthenticated}
-                      onAuthRequired={handleAuthRequired}
-                    />
-                  ))}
+                  {savedProfiles
+                    .filter(profile => !emailSelections.hasOwnProperty(profile.id) || emailSelections[profile.id] !== 'removed')
+                    .map((profile) => (
+                      <SavedProfileListItem
+                        key={profile.id}
+                        profile={profile}
+                        onRemove={removeSavedProfile}
+                        emailChecked={emailSelections[profile.id] || false}
+                        onEmailChange={handleEmailChange}
+                        invitationChecked={invitationSelections[profile.id] || false}
+                        onInvitationChange={handleInvitationChange}
+                        selectedDateTime={dateTimes[profile.id]}
+                        onDateTimeChange={handleDateTimeChange}
+                        emailAddress={emailAddresses[profile.id] || ''}
+                        onEmailAddressChange={handleEmailAddressChange}
+                        status={profileStatuses[profile.id] || 'Under Review'}
+                        onStatusChange={handleStatusChange}
+                        onTranscriptClick={handleTranscriptClick}
+                        isAuthenticated={isAuthenticated}
+                        onAuthRequired={handleAuthRequired}
+                      />
+                    ))}
                 </div>
 
                 {/* Submit Button with Auth Check */}
@@ -492,7 +536,7 @@ function SavedProfiles({ onNavigate, onNewSearch, hasSearchResults }) {
         </div>
       </div>
 
-      {/* Transcript Popup */}
+      {/* Keep your existing Transcript Popup */}
       {transcriptPopup.visible && (
         <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
