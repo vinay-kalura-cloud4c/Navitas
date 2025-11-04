@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import useStore from '../store/useStore';
+
 
 const Dashboard = ({ onNavigate, onNewSearch }) => {
     const {
@@ -8,14 +9,19 @@ const Dashboard = ({ onNavigate, onNewSearch }) => {
         dashboardLoading,
         setDashboardLoading,
         setProfiles,
-        setSelectedSearchHistory
+        setSelectedSearchHistory,
+        setAtsProfiles
     } = useStore();
+
+
+    const [viewMode, setViewMode] = useState('normal'); // 'normal' or 'job_requisition'
+
 
     useEffect(() => {
         fetchSearchHistory();
-    }, []);
+    }, [viewMode]);
 
-    // Updated handleViewResults function in Dashboard.js
+
     const handleViewResults = async (search) => {
         try {
             const response = await fetch(`http://localhost:8000/api/search-history/${search.search_id}`, {
@@ -26,18 +32,18 @@ const Dashboard = ({ onNavigate, onNewSearch }) => {
                 }
             });
 
+
             if (response.ok) {
                 const data = await response.json();
                 const searchData = data.search;
 
-                // Parse search results and extract profiles
+
                 let profiles = [];
                 if (searchData.search_results && searchData.search_results.top_profiles) {
                     profiles = searchData.search_results.top_profiles.map((profile, index) => {
-                        // Extract name from title (remove extra text after " - ")
                         const name = profile.title.split(' - ')[0] || profile.title;
 
-                        // Determine platform from link
+
                         let platform = 'default';
                         if (profile.link.includes('linkedin.com')) {
                             platform = 'linkedin';
@@ -47,27 +53,25 @@ const Dashboard = ({ onNavigate, onNewSearch }) => {
                             platform = 'indeed';
                         }
 
+
                         return {
-                            id: `${search.search_id}_${index}`, // Generate unique ID
-                            name: name, // Extract name from title
-                            short_summary: profile.snippet || '', // Use snippet as short summary
-                            full_summary: profile.snippet || '', // Use same as full summary (since we don't have more detailed info)
+                            id: `${search.search_id}_${index}`,
+                            name: name,
+                            short_summary: profile.snippet || '',
+                            full_summary: profile.snippet || '',
                             link: profile.link,
                             score: profile.score,
-                            platform: platform // Add platform based on URL
+                            platform: platform
                         };
                     });
                 }
 
-                console.log('Transformed profiles:', profiles); // Debug log
 
-                // Set the profiles in the store
+                console.log('Transformed profiles:', profiles);
+
+
                 setProfiles(profiles);
-
-                // Store the search history data for reference
                 setSelectedSearchHistory(searchData);
-
-                // Navigate to results page
                 onNavigate('results');
             }
         } catch (error) {
@@ -76,17 +80,13 @@ const Dashboard = ({ onNavigate, onNewSearch }) => {
         }
     };
 
-    // New function to handle viewing shortlisted candidates
-    // Updated function in Dashboard.js
-    const handleViewShortlisted = (search) => {
-        try {
-            // Set the selected search history in the store
-            setSelectedSearchHistory(search);
 
-            // Navigate to saved profiles page to show shortlisted candidates
-            onNavigate('saved');
+    const handleViewShortlisted = async (search) => {
+        try {
+            setSelectedSearchHistory(search);
+            onNavigate('ats');
         } catch (error) {
-            console.error('Failed to navigate to shortlisted candidates:', error);
+            console.error('Failed to navigate to ATS:', error);
             alert('Failed to load shortlisted candidates. Please try again.');
         }
     };
@@ -95,54 +95,34 @@ const Dashboard = ({ onNavigate, onNewSearch }) => {
     const fetchSearchHistory = async () => {
         setDashboardLoading(true);
         try {
-            // Updated to use cookies instead of Authorization header
-            const response = await fetch('http://localhost:8000/api/search-history', {
-                method: 'GET',
-                credentials: 'include', // This ensures cookies are sent with the request
-                headers: {
-                    'Content-Type': 'application/json'
+            const isJobRequisition = viewMode === 'job_requisition';
+            const response = await fetch(
+                `http://localhost:8000/api/search-history?is_job_requisition=${isJobRequisition}`,
+                {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
                 }
-            });
+            );
+
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
+
             const data = await response.json();
             setSearchHistory(data.searches || []);
         } catch (error) {
             console.error('Failed to fetch search history:', error);
-            // Mock data for development
-            setSearchHistory([
-                {
-                    search_id: 'cd450b95-b3ba-4ef1-b369-0b3a2caa3e2a',
-                    job_description: 'Software Engineer Hyderabad',
-                    total_matches: 10,
-                    shortlisted_count: 3,
-                    search_status: 'completed',
-                    created_at: '2025-09-17T11:21:14.969094'
-                },
-                {
-                    search_id: 'cd450b95-b3ba-4ef1-b369-0b3a2caa3e2b',
-                    job_description: 'React Developer Mumbai',
-                    total_matches: 15,
-                    shortlisted_count: 5,
-                    search_status: 'completed',
-                    created_at: '2025-09-16T10:15:30.123456'
-                },
-                {
-                    search_id: 'cd450b95-b3ba-4ef1-b369-0b3a2caa3e2c',
-                    job_description: 'Full Stack Developer Bangalore',
-                    total_matches: 8,
-                    shortlisted_count: 2,
-                    search_status: 'pending',
-                    created_at: '2025-09-15T14:30:45.789012'
-                }
-            ]);
+            setSearchHistory([]);
         } finally {
             setDashboardLoading(false);
         }
     };
+
 
     const handleDeleteSearch = async (searchId) => {
         try {
@@ -154,14 +134,15 @@ const Dashboard = ({ onNavigate, onNewSearch }) => {
                 }
             });
 
+
             if (response.ok) {
-                // Refresh the search history
                 fetchSearchHistory();
             }
         } catch (error) {
             console.error('Failed to delete search:', error);
         }
     };
+
 
     const formatDate = (dateString) => {
         return new Date(dateString).toLocaleDateString('en-US', {
@@ -172,6 +153,14 @@ const Dashboard = ({ onNavigate, onNewSearch }) => {
             minute: '2-digit'
         });
     };
+
+
+    const generateJRNumber = (search, index) => {
+        const designation = search.designation || 'JOB';
+        const serialNo = (index + 1).toString().padStart(3, '0');
+        return `JR-${designation}-${serialNo}`;
+    };
+
 
     if (dashboardLoading) {
         return (
@@ -184,9 +173,9 @@ const Dashboard = ({ onNavigate, onNewSearch }) => {
         );
     }
 
+
     return (
         <div className="p-6 max-w-7xl mx-auto">
-            {/* Header */}
             <div className="flex justify-between items-center mb-8">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -209,13 +198,42 @@ const Dashboard = ({ onNavigate, onNewSearch }) => {
                 </div>
             </div>
 
-            {/* Stats Overview */}
+
+            {/* Toggle Switch */}
+            <div className="mb-6 flex items-center gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">View Mode:</span>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setViewMode('normal')}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all ${viewMode === 'normal'
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                            }`}
+                    >
+                        Normal Searches
+                    </button>
+                    <button
+                        onClick={() => setViewMode('job_requisition')}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all ${viewMode === 'job_requisition'
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                            }`}
+                    >
+                        Job Requisitions
+                    </button>
+                </div>
+            </div>
+
+
+            {/* Metrics grid */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
                     <div className="text-2xl font-bold text-gray-900 dark:text-white">
                         {searchHistory.length}
                     </div>
-                    <div className="text-gray-600 dark:text-gray-400 text-sm">Total Searches</div>
+                    <div className="text-gray-600 dark:text-gray-400 text-sm">
+                        Total {viewMode === 'job_requisition' ? 'Requisitions' : 'Searches'}
+                    </div>
                 </div>
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
                     <div className="text-2xl font-bold text-green-600">
@@ -233,11 +251,11 @@ const Dashboard = ({ onNavigate, onNewSearch }) => {
                     <div className="text-2xl font-bold text-purple-600">
                         {searchHistory.reduce((sum, s) => sum + (s.shortlisted_count || 0), 0)}
                     </div>
-                    <div className="text-gray-600 dark:text-gray-400 text-sm">Shortlisted</div>
+                    <div className="text-gray-600 dark:text-gray-400 text-sm">Screen Selects</div>
                 </div>
             </div>
 
-            {/* Search History Table/Tile View */}
+
             {searchHistory.length === 0 ? (
                 <div className="text-center py-16">
                     <div className="text-gray-400 mb-4">
@@ -246,30 +264,35 @@ const Dashboard = ({ onNavigate, onNewSearch }) => {
                         </svg>
                     </div>
                     <div className="text-xl text-gray-600 dark:text-gray-400 mb-2">
-                        No search history found
+                        No {viewMode === 'job_requisition' ? 'job requisitions' : 'searches'} found
                     </div>
                     <div className="text-gray-500 dark:text-gray-500">
-                        Start searching to see your history here
+                        Click the new search button to get started
                     </div>
                 </div>
             ) : (
-                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 ">
                     {/* Table Header */}
-                    <div className="grid grid-cols-12 gap-4 p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {/* <div className="col-span-1">Status</div> */}
-                        <div className="col-span-5">Job Description</div>
+                    <div className="grid grid-cols-12 gap-3 p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <div className="col-span-2 text-center">
+                            {viewMode === 'job_requisition' ? 'JR No.' : 'S.No.'}
+                        </div>
+                        <div className="col-span-4">Job Description</div>
                         <div className="col-span-2">Created Date</div>
                         <div className="col-span-1 text-center">Matches</div>
-                        <div className="col-span-1 text-center">Shortlisted</div>
-                        <div className="col-span-3 text-center">Actions</div>
+                        <div className="col-span-2 text-center">Screen Selects</div>
+                        <div className="col-span-1 text-center">Actions</div>
                     </div>
 
-                    {/* Table Body - Tile Rows */}
+
                     <div className="divide-y divide-gray-200 dark:divide-gray-600">
-                        {searchHistory.map((search) => (
+                        {searchHistory.map((search, index) => (
                             <SearchTile
                                 key={search.search_id}
                                 search={search}
+                                index={index}
+                                viewMode={viewMode}
+                                jrNumber={generateJRNumber(search, index)}
                                 formatDate={formatDate}
                                 onViewResults={handleViewResults}
                                 onViewShortlisted={handleViewShortlisted}
@@ -283,105 +306,151 @@ const Dashboard = ({ onNavigate, onNewSearch }) => {
     );
 };
 
-const SearchTile = ({ search, formatDate, onViewResults, onViewShortlisted, onDelete }) => {
-    const getStatusConfig = (status) => {
-        switch (status) {
-            case 'completed':
-                return {
-                    color: 'text-green-700 dark:text-green-400',
-                    bg: 'bg-green-100 dark:bg-green-900/20',
-                    icon: '✓'
-                };
-            case 'pending':
-                return {
-                    color: 'text-yellow-700 dark:text-yellow-400',
-                    bg: 'bg-yellow-100 dark:bg-yellow-900/20',
-                    icon: '⏳'
-                };
-            case 'failed':
-                return {
-                    color: 'text-red-700 dark:text-red-400',
-                    bg: 'bg-red-100 dark:bg-red-900/20',
-                    icon: '✗'
-                };
-            default:
-                return {
-                    color: 'text-gray-700 dark:text-gray-400',
-                    bg: 'bg-gray-100 dark:bg-gray-900/20',
-                    icon: '◦'
-                };
-        }
+
+const SearchTile = ({ search, index, viewMode, jrNumber, formatDate, onViewResults, onViewShortlisted, onDelete }) => {
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const dropdownRef = useRef(null);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setIsDropdownOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
+    const toggleDropdown = () => {
+        setIsDropdownOpen(!isDropdownOpen);
     };
 
-    const statusConfig = getStatusConfig(search.search_status);
+    const handleAction = (action) => {
+        action();
+        setIsDropdownOpen(false);
+    };
 
     return (
-        <div className="grid grid-cols-12 gap-4 p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-            {/* Status */}
-            {/* <div className="col-span-1 flex items-center">
-                <div className={`px-2 py-1 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.color} flex items-center gap-1`}>
-                    <span>{statusConfig.icon}</span>
-                    <span className="capitalize hidden sm:inline">{search.search_status}</span>
+        <div className="grid grid-cols-12 gap-3 p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+            <div className="col-span-2 flex items-center justify-center">
+                <div className="font-semibold text-gray-900 dark:text-white">
+                    {viewMode === 'job_requisition' ? jrNumber : (index + 1).toString().padStart(2, '0')}
                 </div>
-            </div> */}
+            </div>
 
-            {/* Job Description */}
-            <div className="col-span-5 flex items-center">
+
+            <div className="col-span-4 flex items-center">
                 <div className="truncate">
                     <div className="font-medium text-gray-900 dark:text-white truncate">
                         {search.job_description}
                     </div>
-                    {/* <div className="text-xs text-gray-500 dark:text-gray-400">
-                        ID: {search.search_id.slice(0, 8)}...
-                    </div> */}
                 </div>
             </div>
 
-            {/* Created Date */}
+
             <div className="col-span-2 flex items-center">
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                     {formatDate(search.created_at)}
                 </div>
             </div>
 
-            {/* Total Matches */}
+
             <div className="col-span-1 flex items-center justify-center">
                 <div className="text-lg font-semibold text-blue-600 dark:text-blue-400">
                     {search.total_matches || 0}
                 </div>
             </div>
 
-            {/* Shortlisted Count */}
-            <div className="col-span-1 flex items-center justify-center">
-                <div className="text-lg font-semibold text-green-600 dark:text-green-400">
+
+            <div className="col-span-2 flex items-center justify-center">
+                <div className="text-lg font-semibold text-purple-600 dark:text-purple-400">
                     {search.shortlisted_count || 0}
                 </div>
             </div>
 
-            {/* Actions */}
-            <div className="col-span-3 flex items-center justify-center gap-2">
+
+            <div className="col-span-1 flex items-center justify-center gap-2 relative" ref={dropdownRef}>
+                {/* Three Dots Button */}
                 <button
-                    onClick={() => onViewResults(search)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs py-1.5 px-3 rounded font-medium transition-colors"
+                    onClick={toggleDropdown}
+                    className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                    title="Actions"
                 >
-                    View Results
+                    <svg className="w-5 h-5 text-gray-700 dark:text-gray-300" fill="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="5" r="2" />
+                        <circle cx="12" cy="12" r="2" />
+                        <circle cx="12" cy="19" r="2" />
+                    </svg>
                 </button>
-                <button
-                    onClick={() => onViewShortlisted(search)}
-                    className="bg-green-600 hover:bg-green-700 text-white text-xs py-1.5 px-3 rounded font-medium transition-colors"
-                    disabled={!search.shortlisted_count || search.shortlisted_count === 0}
-                >
-                    Shortlisted
-                </button>
-                <button
-                    onClick={() => onDelete(search.search_id)}
-                    className="bg-red-100 hover:bg-red-200 dark:bg-red-900/20 dark:hover:bg-red-800/30 text-red-700 dark:text-red-400 text-xs py-1.5 px-3 rounded font-medium transition-colors"
-                >
-                    Delete
-                </button>
+
+                {/* Dropdown Menu */}
+                {isDropdownOpen && (
+                    <div className="absolute right-0 top-10 mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-10">
+                        <div className="py-1">
+                            <button
+                                onClick={() => handleAction(() => onViewResults(search))}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-2"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                View Results
+                            </button>
+
+                            <button
+                                onClick={() => handleAction(() => onViewShortlisted(search))}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900/20 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={!search.shortlisted_count || search.shortlisted_count === 0}
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Screen Select
+                            </button>
+
+                            <button
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={!search.interview_count || search.interview_count === 0}
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                Interview
+                            </button>
+
+                            <button
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-teal-50 dark:hover:bg-teal-900/20 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={!search.selected_count || search.selected_count === 0}
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Shortlisted
+                            </button>
+
+                            <hr className="my-1 border-gray-200 dark:border-gray-600" />
+
+                            <button
+                                onClick={() => handleAction(() => onDelete(search.search_id))}
+                                className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
 };
+
 
 export default Dashboard;

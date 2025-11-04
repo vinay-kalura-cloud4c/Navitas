@@ -6,6 +6,138 @@ import useStore from '../store/useStore'
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL_DEV || 'https://127.0.0.1:8000';
 
+// Error Display Component
+const ErrorAlert = ({ error, onClose }) => {
+  if (!error) return null;
+
+  const parseError = (errorData) => {
+    // Handle the specific API error structure you're receiving
+    if (errorData?.detail?.error) {
+      const errorMessage = errorData.detail.error;
+
+      // Check for specific Graph API errors
+      if (errorMessage.includes('MailboxNotEnabledForRESTAPI')) {
+        return {
+          type: 'mailbox_error',
+          title: 'Mailbox Not Available',
+          message: 'The user\'s mailbox is not enabled for API access. This could be because:',
+          suggestions: [
+            'The mailbox is hosted on-premises (not in Microsoft 365)',
+            'The user account is inactive or soft-deleted',
+            'The account needs to be properly configured for Graph API access',
+            'Try using a different user account with proper Microsoft 365 licensing'
+          ]
+        };
+      }
+
+      // Handle other API errors
+      if (errorMessage.includes('APIError')) {
+        const codeMatch = errorMessage.match(/Code: (\d+)/);
+        const code = codeMatch ? codeMatch[1] : 'Unknown';
+
+        return {
+          type: 'api_error',
+          title: `API Error (${code})`,
+          message: 'There was an issue with the Microsoft Graph API request.',
+          suggestions: [
+            'Check if the user has proper permissions',
+            'Verify the OAuth token is valid and not expired',
+            'Ensure the user account is properly configured'
+          ]
+        };
+      }
+    }
+
+    // Handle HTTP errors
+    if (typeof errorData === 'string' && errorData.includes('HTTP error')) {
+      const statusMatch = errorData.match(/status: (\d+)/);
+      const status = statusMatch ? statusMatch[1] : 'Unknown';
+
+      return {
+        type: 'http_error',
+        title: `Network Error (${status})`,
+        message: 'Failed to connect to the server.',
+        suggestions: [
+          'Check your internet connection',
+          'The server might be temporarily unavailable',
+          'Try again in a few moments'
+        ]
+      };
+    }
+
+    // Fallback for unknown errors
+    return {
+      type: 'unknown_error',
+      title: 'Something went wrong',
+      message: typeof errorData === 'string' ? errorData : 'An unexpected error occurred.',
+      suggestions: [
+        'Try refreshing the page',
+        'Check your internet connection',
+        'Contact support if the issue persists'
+      ]
+    };
+  };
+
+  const parsedError = parseError(error);
+
+  const getErrorColor = (type) => {
+    switch (type) {
+      case 'mailbox_error':
+        return 'border-orange-200 bg-orange-50 text-orange-800';
+      case 'api_error':
+        return 'border-red-200 bg-red-50 text-red-800';
+      case 'http_error':
+        return 'border-blue-200 bg-blue-50 text-blue-800';
+      default:
+        return 'border-gray-200 bg-gray-50 text-gray-800';
+    }
+  };
+
+  const getErrorIcon = (type) => {
+    switch (type) {
+      case 'mailbox_error':
+        return '⚠️';
+      case 'api_error':
+        return '❌';
+      case 'http_error':
+        return '🌐';
+      default:
+        return 'ℹ️';
+    }
+  };
+
+  return (
+    <div className={`mb-4 p-4 border rounded-lg ${getErrorColor(parsedError.type)}`}>
+      <div className="flex items-start justify-between">
+        <div className="flex items-start space-x-3 flex-1">
+          <span className="text-xl">{getErrorIcon(parsedError.type)}</span>
+          <div className="flex-1">
+            <h4 className="font-semibold text-sm mb-1">{parsedError.title}</h4>
+            <p className="text-sm mb-2">{parsedError.message}</p>
+
+            {parsedError.suggestions && parsedError.suggestions.length > 0 && (
+              <div className="text-xs">
+                <p className="font-medium mb-1">Possible solutions:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  {parsedError.suggestions.map((suggestion, index) => (
+                    <li key={index}>{suggestion}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="ml-4 text-gray-400 hover:text-gray-600 focus:outline-none"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const SavedProfileListItem = ({
   profile,
   onRemove,
@@ -16,9 +148,7 @@ const SavedProfileListItem = ({
   emailAddress,
   onEmailAddressChange,
   status,
-  onStatusChange,
-  isAuthenticated,
-  onAuthRequired
+  onStatusChange
 }) => {
   const [showQuestions, setShowQuestions] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -29,43 +159,24 @@ const SavedProfileListItem = ({
   const [questionsLoaded, setQuestionsLoaded] = useState(false);
   const [questionsError, setQuestionsError] = useState(null);
 
-  // Auto-load questions when component mounts
+  // New error states
+  const [meetingError, setMeetingError] = useState(null);
+  const [emailError, setEmailError] = useState(null);
+  const [transcriptError, setTranscriptError] = useState(null);
+
   useEffect(() => {
     const loadQuestionsOnMount = async () => {
-      // Check if questions are already cached
       const savedQuestions = JSON.parse(localStorage.getItem('interviewQuestions') || '{}');
 
       if (savedQuestions[profile.id]) {
-        // Questions already exist, mark as loaded
         setQuestionsLoaded(true);
         return;
       }
-
-      // No cached questions, generate them automatically
       await generateInterviewQuestions();
     };
 
     loadQuestionsOnMount();
-  }, [profile.id]); // Only run when profile.id changes
-
-  const secureApiCall = async (url, options = {}) => {
-    const response = await fetch(url, {
-      ...options,
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-        ...options.headers
-      }
-    });
-
-    if (response.status === 401) {
-      onAuthRequired?.(); // Notify parent that auth is required
-      throw new Error('Authentication required');
-    }
-
-    return response;
-  };
+  }, [profile.id]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -80,22 +191,20 @@ const SavedProfileListItem = ({
     }
   };
 
-  // Generate interview questions (auto-called on mount)
   const generateInterviewQuestions = async () => {
     setLoading(true);
     setQuestionsError(null);
 
     try {
-      // Get the job description from selectedSearchHistory in the Zustand store
       const { selectedSearchHistory } = useStore.getState();
 
-      // Extract job description from selectedSearchHistory or provide a fallback
       const jobDescription = selectedSearchHistory?.job_description ||
         selectedSearchHistory?.search_query ||
         "General interview for the position";
 
       const response = await fetch(`${BACKEND_URL}/api/generate-questions`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -113,7 +222,6 @@ const SavedProfileListItem = ({
 
       const data = await response.json();
 
-      // Save questions to localStorage
       const savedQuestions = JSON.parse(localStorage.getItem('interviewQuestions') || '{}');
       const questionsToStore = typeof data.questions === 'string'
         ? data.questions
@@ -128,28 +236,22 @@ const SavedProfileListItem = ({
     } catch (error) {
       console.error('Error generating interview questions:', error);
       setQuestionsError(error.message);
-      // Don't show alert for auto-loading failures, just log the error
     } finally {
       setLoading(false);
     }
   };
 
-  // Schedule meeting with authentication check
+  // Enhanced scheduleMeeting with better error handling
   const scheduleMeeting = async () => {
-    // Get values from the Zustand store
     const { meetingSubject, durationMinutes, additionalEmail } = useStore.getState();
 
-    if (!isAuthenticated) {
-      onAuthRequired?.();
-      return;
-    }
-
     if (!selectedDateTime) {
-      alert('Please select a date and time for the meeting.');
+      setMeetingError('Please select a date and time for the meeting.');
       return;
     }
 
     setMeetingLoading(true);
+    setMeetingError(null); // Clear previous errors
 
     try {
       const meetingData = {
@@ -160,24 +262,30 @@ const SavedProfileListItem = ({
         duration_minutes: durationMinutes || 60
       };
 
-      // Add additional email if provided
       if (additionalEmail && additionalEmail.trim() !== '') {
         meetingData.attendees.push(additionalEmail);
       }
 
-      const response = await secureApiCall(`${BACKEND_URL}/schedule-meeting`, {
+      const response = await fetch(`${BACKEND_URL}/api/schedule-meeting`, {
         method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
         body: JSON.stringify(meetingData)
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Meeting scheduling error:', errorData);
+        setMeetingError(errorData);
+        return;
       }
 
       const result = await response.json();
       console.log('Meeting scheduled:', result);
 
-      // Store the meeting id in session storage
       if (result.id) {
         sessionStorage.setItem('meetingid', result.id);
         console.log('Meeting ID saved in sessionStorage:', sessionStorage.getItem('meetingid'));
@@ -186,30 +294,28 @@ const SavedProfileListItem = ({
         console.warn('No meeting ID found in the response');
       }
 
-      alert('Meeting scheduled successfully!');
+      // Show success message instead of alert
       onStatusChange(profile.id, 'Invite Sent');
+
+      // You could add a success toast here instead of alert
+      alert('Meeting scheduled successfully!');
 
     } catch (error) {
       console.error('Error scheduling meeting:', error);
-      if (error.message !== 'Authentication required') {
-        alert('Failed to schedule meeting. Please try again.');
-      }
+      setMeetingError(error.message || 'Failed to schedule meeting. Please try again.');
     } finally {
       setMeetingLoading(false);
     }
   };
 
-  // Send email with authentication check
+  // Enhanced sendEmail with better error handling
   const sendEmail = async () => {
-    if (!isAuthenticated) {
-      onAuthRequired?.();
+    if (!emailAddress) {
+      setEmailError('Please enter an email address.');
       return;
     }
 
-    if (!emailAddress) {
-      alert('Please enter an email address.');
-      return;
-    }
+    setEmailError(null); // Clear previous errors
 
     try {
       const emailData = {
@@ -219,13 +325,20 @@ const SavedProfileListItem = ({
         cc_recipients: []
       };
 
-      const response = await secureApiCall(`${BACKEND_URL}/send-email`, {
+      const response = await fetch(`${BACKEND_URL}/send-email`, {
         method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
         body: JSON.stringify(emailData)
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        setEmailError(errorData);
+        return;
       }
 
       alert('Email sent successfully!');
@@ -233,20 +346,14 @@ const SavedProfileListItem = ({
 
     } catch (error) {
       console.error('Error sending email:', error);
-      if (error.message !== 'Authentication required') {
-        alert('Failed to send email. Please try again.');
-      }
+      setEmailError(error.message || 'Failed to send email. Please try again.');
     }
   };
 
-  // Get transcript with authentication check
+  // Enhanced getTranscript with better error handling
   const getTranscript = async (meetingId) => {
-    if (!isAuthenticated) {
-      onAuthRequired?.();
-      return;
-    }
+    setTranscriptError(null); // Clear previous errors
 
-    // Check if transcript data is already in session storage
     const storageKey = `transcript_data_${meetingId}`;
     const cachedData = sessionStorage.getItem(storageKey);
 
@@ -260,14 +367,18 @@ const SavedProfileListItem = ({
     }
 
     try {
-      // Get job description from Zustand store for transcript analysis
       const { selectedSearchHistory } = useStore.getState();
       const jobDescription = selectedSearchHistory?.job_description ||
         selectedSearchHistory?.search_query ||
         "General interview position";
 
-      const response = await secureApiCall(`${BACKEND_URL}/get-transcription`, {
+      const response = await fetch(`${BACKEND_URL}/get-transcription`, {
         method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
         body: JSON.stringify({
           organizer: "me",
           id: meetingId,
@@ -276,7 +387,9 @@ const SavedProfileListItem = ({
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        setTranscriptError(errorData);
+        return;
       }
 
       const result = await response.json();
@@ -305,9 +418,7 @@ const SavedProfileListItem = ({
 
     } catch (error) {
       console.error('Error getting transcript:', error);
-      if (error.message !== 'Authentication required') {
-        alert('Failed to get transcript. Please try again.');
-      }
+      setTranscriptError(error.message || 'Failed to get transcript. Please try again.');
     }
   };
 
@@ -323,7 +434,6 @@ const SavedProfileListItem = ({
 
   const hasStoredQuestions = !!getStoredQuestions();
 
-  // Get questions status for display
   const getQuestionsStatus = () => {
     if (loading) return { text: 'Loading Questions...', color: 'bg-yellow-500 text-white', disabled: true };
     if (questionsError) return { text: 'Questions Failed', color: 'bg-red-500 text-white', disabled: false };
@@ -335,6 +445,20 @@ const SavedProfileListItem = ({
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6 mb-4 border border-gray-200">
+      {/* Error displays */}
+      <ErrorAlert
+        error={meetingError}
+        onClose={() => setMeetingError(null)}
+      />
+      <ErrorAlert
+        error={emailError}
+        onClose={() => setEmailError(null)}
+      />
+      <ErrorAlert
+        error={transcriptError}
+        onClose={() => setTranscriptError(null)}
+      />
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         <div className="lg:col-span-3">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">
@@ -386,14 +510,11 @@ const SavedProfileListItem = ({
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm mb-2"
           />
 
-          {/* Auto-loaded Questions Button */}
           <button
             onClick={() => {
               if (questionsError) {
-                // Retry loading questions if there was an error
                 generateInterviewQuestions();
               } else if (questionsLoaded || hasStoredQuestions) {
-                // Show questions if they're loaded
                 setShowQuestions(true);
               }
             }}
@@ -403,12 +524,19 @@ const SavedProfileListItem = ({
             {questionsStatus.text}
           </button>
 
-          {/* Optional error message */}
           {questionsError && (
             <p className="text-xs text-red-600 mt-1">
               Click to retry loading questions
             </p>
           )}
+
+          <button
+            onClick={sendEmail}
+            disabled={!emailAddress}
+            className={`w-full px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${!emailAddress ? 'opacity-50 cursor-not-allowed bg-gray-300 text-gray-500' : 'text-white bg-blue-600 hover:bg-blue-700'}`}
+          >
+            Send Email
+          </button>
         </div>
 
         <div className="lg:col-span-1 flex flex-col items-center">
@@ -430,13 +558,10 @@ const SavedProfileListItem = ({
           />
           <button
             onClick={scheduleMeeting}
-            disabled={meetingLoading || !selectedDateTime}
-            className={`w-full px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 ${!isAuthenticated
-              ? 'text-green-700 bg-green-50 border border-green-300 hover:bg-green-100'
-              : 'text-white bg-green-600 hover:bg-green-700'
-              } ${(!selectedDateTime || meetingLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={!selectedDateTime || meetingLoading}
+            className={`w-full px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 text-white bg-green-600 hover:bg-green-700 ${(!selectedDateTime || meetingLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            {meetingLoading ? 'Scheduling...' : !isAuthenticated ? '🔒 Schedule (Login Required)' : 'Schedule Meeting'}
+            {meetingLoading ? 'Scheduling...' : 'Schedule Meeting'}
           </button>
         </div>
 
@@ -444,12 +569,9 @@ const SavedProfileListItem = ({
           <label className="text-sm font-medium text-gray-700 mb-2 lg:hidden">Transcript</label>
           <button
             onClick={handleTranscriptClick}
-            className={`px-3 py-2 text-sm font-medium border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${!isAuthenticated
-              ? 'text-blue-700 bg-blue-50 border-blue-300 hover:bg-blue-100'
-              : 'text-blue-700 bg-blue-50 border-blue-300 hover:bg-blue-100'
-              }`}
+            className="px-3 py-2 text-sm font-medium border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-blue-700 bg-blue-50 border-blue-300 hover:bg-blue-100"
           >
-            {!isAuthenticated ? '🔒 Transcript' : 'Transcript'}
+            Transcript
           </button>
         </div>
 

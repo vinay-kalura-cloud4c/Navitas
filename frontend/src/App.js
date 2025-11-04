@@ -6,16 +6,28 @@ import SavedProfiles from './components/SavedProfiles'
 import Dashboard from './components/dashboard'
 import LoginPage from './components/LoginPage'
 import AuthService from './components/AuthService'
+import { ResponseInterceptor } from './components/ResponseInterceptor'
 import { SearchCacheProvider } from './contexts/SearchCacheContext'
 import { Sidebar, SidebarBody, SidebarLink } from './components/ui/sidebar'
-import { IconSearch, IconDashboard, IconBookmark, IconLogout } from '@tabler/icons-react'
+import ApplicantTracking from './components/ApplicantTracking'
+import { IconSearch, IconDashboard, IconBookmark, IconLogout, IconUsers } from '@tabler/icons-react'
 import { motion } from 'framer-motion'
 
 function App() {
-  const [currentView, setCurrentView] = useState('landing')
-  const [searchQuery, setSearchQuery] = useState('')
+  // Initialize state from sessionStorage or default to 'landing'
+  const [currentView, setCurrentView] = useState(() => {
+    const savedView = sessionStorage.getItem('currentView')
+    return savedView || 'landing'
+  })
+
+  const [searchQuery, setSearchQuery] = useState(() => {
+    const savedQuery = sessionStorage.getItem('searchQuery')
+    return savedQuery || ''
+  })
+
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [showSessionExpiredMessage, setShowSessionExpiredMessage] = useState(false)
 
   // Check authentication on app load
   useEffect(() => {
@@ -28,10 +40,34 @@ function App() {
     checkAuth()
   }, [])
 
+  // Persist currentView to sessionStorage whenever it changes
+  useEffect(() => {
+    sessionStorage.setItem('currentView', currentView)
+  }, [currentView])
+
+  // Persist searchQuery to sessionStorage whenever it changes
+  useEffect(() => {
+    sessionStorage.setItem('searchQuery', searchQuery)
+  }, [searchQuery])
+
+  // Handle 401 unauthorized globally
+  const handleUnauthorized = () => {
+    setUser(null)
+    setShowSessionExpiredMessage(true)
+
+    // Hide message after 3 seconds
+    setTimeout(() => {
+      setShowSessionExpiredMessage(false)
+    }, 3000)
+  }
+
   // Handle logout
   const handleLogout = async () => {
     await AuthService.logout()
     setUser(null)
+    // Clear persisted state on logout
+    sessionStorage.removeItem('currentView')
+    sessionStorage.removeItem('searchQuery')
   }
 
   const handleSearch = (query) => {
@@ -50,6 +86,7 @@ function App() {
 
   const handleNewSearch = () => {
     setCurrentView('landing')
+    setSearchQuery('')
   }
 
   // Navigation links
@@ -63,6 +100,11 @@ function App() {
       label: "Dashboard",
       href: "#",
       icon: <IconDashboard className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />,
+    },
+    {
+      label: "ATS",
+      href: "#",
+      icon: <IconUsers className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />,
     },
     {
       label: "Saved Profiles",
@@ -79,6 +121,9 @@ function App() {
       case "Dashboard":
         handleNavigate('dashboard')
         break
+      case "ATS":
+        handleNavigate('ats')
+        break
       case "Saved Profiles":
         handleNavigate('saved')
         break
@@ -93,6 +138,8 @@ function App() {
         return currentView === 'landing'
       case "Dashboard":
         return currentView === 'dashboard'
+      case "ATS":
+        return currentView === 'ats'
       case "Saved Profiles":
         return currentView === 'saved'
       default:
@@ -117,43 +164,35 @@ function App() {
 
   // Show login page if not authenticated
   if (!user) {
-    return <LoginPage />
+    return (
+      <>
+        {showSessionExpiredMessage && (
+          <div style={{
+            position: 'fixed',
+            top: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#dc2626',
+            color: 'white',
+            padding: '12px 24px',
+            borderRadius: '8px',
+            zIndex: 9999,
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+            animation: 'slideDown 0.3s ease-out'
+          }}>
+            Your session has expired. Please login again.
+          </div>
+        )}
+        <LoginPage />
+      </>
+    )
   }
 
   // Show main app if authenticated
   return (
     <>
-      {/* User info and logout */}
-      <header style={{
-        position: 'fixed',
-        top: 0,
-        right: 0,
-        padding: '16px',
-        zIndex: 1000,
-        background: 'rgba(255, 255, 255, 0.9)',
-        backdropFilter: 'blur(10px)',
-        borderRadius: '0 0 0 16px'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '14px', color: '#666' }}>
-            Welcome, {user.name}
-          </span>
-          <button
-            onClick={handleLogout}
-            style={{
-              background: '#dc2626',
-              color: 'white',
-              border: 'none',
-              padding: '8px 16px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}
-          >
-            Logout
-          </button>
-        </div>
-      </header>
+      {/* Global Response Interceptor */}
+      <ResponseInterceptor onUnauthorized={handleUnauthorized} />
 
       <SearchCacheProvider>
         <div className="flex h-screen bg-gray-100 dark:bg-neutral-800">
@@ -233,6 +272,9 @@ function App() {
                 onNavigate={handleNavigate}
                 onNewSearch={handleNewSearch}
               />
+            )}
+            {currentView === 'ats' && (
+              <ApplicantTracking />
             )}
           </div>
         </div>

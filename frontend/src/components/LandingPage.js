@@ -6,6 +6,7 @@ import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar"
 import { IconHome, IconBookmark, IconSearch } from "@tabler/icons-react"
 import useStore from '../store/useStore'
 
+
 export default function LandingPage({ onSearch, onNavigate }) {
   const [searchQuery, setSearchQuery] = useState('')
   const setProfiles = useStore(state => state.setProfiles)
@@ -13,17 +14,21 @@ export default function LandingPage({ onSearch, onNavigate }) {
   const [loading, setLoading] = useState(false)
   const isSearchingRef = useRef(false)
 
-  const searchProfiles = useCallback(async (query) => {
+
+  const searchProfiles = useCallback(async (query, isJobRequisition) => {
     if (isSearchingRef.current || loading) {
       console.log('Search already in progress, skipping...')
       return
     }
 
+
     isSearchingRef.current = true
     setLoading(true)
 
+
     try {
-      console.log('Making API call with query:', query)
+      console.log('Making API call with query:', query, 'is_job_requisition:', isJobRequisition)
+
 
       const response = await fetch(`http://localhost:8000/api/match`, {
         method: 'POST',
@@ -33,15 +38,19 @@ export default function LandingPage({ onSearch, onNavigate }) {
         },
         body: JSON.stringify({
           "job_description": query,
+          "is_job_requisition": isJobRequisition
         }),
       })
+
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
+
       const data = await response.json()
       console.log('API response received:', data)
+
 
       const mappedProfiles = (data.top_profiles || []).map((profile, index) => ({
         id: index,
@@ -53,13 +62,15 @@ export default function LandingPage({ onSearch, onNavigate }) {
         platform: profile.platform || 'LinkedIn',
       }))
 
+
       setProfiles(mappedProfiles)
       setSelectedSearchHistory({
-        search_id: data.search_id,          // take from backend response
+        search_id: data.search_id,
         job_description: query,
         top_profiles: mappedProfiles
       })
       onSearch(query)
+
 
     } catch (error) {
       console.error('Error searching profiles:', error)
@@ -70,12 +81,13 @@ export default function LandingPage({ onSearch, onNavigate }) {
     }
   }, [onSearch, loading, setProfiles])
 
-  const handleSubmit = useCallback((e) => {
-    e.preventDefault()
+
+  const handleSearchSubmit = useCallback((isJobRequisition) => {
     if (searchQuery.trim() && !loading) {
-      searchProfiles(searchQuery)
+      searchProfiles(searchQuery, isJobRequisition)
     }
   }, [searchQuery, loading, searchProfiles])
+
 
   const links = [
     {
@@ -98,28 +110,9 @@ export default function LandingPage({ onSearch, onNavigate }) {
     }
   ]
 
+
   return (
     <div className="h-screen flex">
-      {/* <Sidebar> */}
-      {/* <SidebarBody className="justify-between gap-10">
-          <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-            <div className="flex px-4 py-4">
-              <div className="text-lg font-semibold text-neutral-800 dark:text-neutral-200">
-                AX UI
-              </div>
-            </div>
-
-            <div className="mt-8 flex flex-col gap-2">
-              {links.map((link, idx) => (
-                <div key={idx} onClick={link.onClick} className="cursor-pointer">
-                  <SidebarLink link={link} />
-                </div>
-              ))}
-            </div>
-          </div>
-        </SidebarBody> */}
-      {/* </Sidebar> */}
-
       <div className="flex-1 overflow-y-auto">
         <StarsBackground className="min-h-screen">
           <div className="bg-black/40 flex flex-col items-center justify-start p-5 min-h-screen">
@@ -130,52 +123,19 @@ export default function LandingPage({ onSearch, onNavigate }) {
                 </h1>
               </header>
 
-              <form onSubmit={handleSubmit} className="max-w-2xl mx-auto mb-20 mt-24">
+
+              <div className="max-w-2xl mx-auto mb-20 mt-24">
                 <Card className="p-2 bg-white/10 backdrop-blur-md border-white/20 shadow-2xl">
                   <InputWithButton
                     value={searchQuery}
-                    onChange={setSearchQuery} // Simplified - just pass the setter
+                    onChange={setSearchQuery}
                     disabled={loading}
-                    placeholder={loading ? "Searching..." : "Accepts Boolean/X-Ray search or Job Description"}
+                    placeholder={loading ? "Searching..." : '("HR Manager" OR "Talent Acquisition") ("pharma" OR "biotech")'}
+                    onSubmit={handleSearchSubmit}
                   />
                 </Card>
-              </form>
+              </div>
 
-              {/* <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-slide-up">
-                <Card className="bg-white/10 backdrop-blur-md border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 hover:shadow-2xl group">
-                  <CardHeader className="text-center">
-                    <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">🔍</div>
-                    <CardTitle className="text-white text-lg">Advanced Search</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-white/80">
-                      Find professionals by job title, skills, and experience
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-                <Card className="bg-white/10 backdrop-blur-md border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 hover:shadow-2xl group">
-                  <CardHeader className="text-center">
-                    <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">📊</div>
-                    <CardTitle className="text-white text-lg">Profile Analytics</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-white/80">
-                      Get detailed insights and match scores for each profile
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-                <Card className="bg-white/10 backdrop-blur-md border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 hover:shadow-2xl group">
-                  <CardHeader className="text-center">
-                    <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">🚀</div>
-                    <CardTitle className="text-white text-lg">Quick Results</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-white/80">
-                      Instant access to relevant professional profiles
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-              </div> */}
 
               <footer className="mt-12 w-full text-right text-white/80">
                 <a

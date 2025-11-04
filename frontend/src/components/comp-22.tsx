@@ -5,7 +5,6 @@ import { Button } from "./ui/Button"
 import { AutoResizeTextarea } from "./ui/AutoResizeTextarea"
 import { Label } from "./ui/Label"
 
-// Add popular locations list
 const POPULAR_LOCATIONS = [
   "Andhra Pradesh, India", "Visakhapatnam, India", "Vijayawada, India", "Tirupati, India",
   "Arunachal Pradesh, India", "Itanagar, India",
@@ -39,16 +38,13 @@ const POPULAR_LOCATIONS = [
   "Union Territories, India", "Chandigarh, India", "Puducherry, India", "Lakshadweep, India", "Andaman and Nicobar Islands, India", "Jammu, India", "Srinagar, India", "Leh, India"
 ];
 
-
-// Updated props interface
 export interface InputWithButtonProps {
   value: string
-  onChange: (value: string) => void // Simplified interface
+  onChange: (value: string) => void
   disabled?: boolean
   placeholder?: string
+  onSubmit?: (isJobRequisition: boolean) => void
 }
-
-
 
 const experienceOptions = [
   { value: "", label: "Any Experience" },
@@ -63,36 +59,50 @@ export default function TalentSearchBar({
   value,
   onChange,
   disabled = false,
-  placeholder = "Accepts Boolean/X-Ray search or Job Description"
+  placeholder = '("HR Manager" OR "Talent Acquisition") ("pharma" OR "biotech")',
+  onSubmit = () => { }
 }: InputWithButtonProps) {
   const id = useId()
   const locationId = useId()
   const experienceId = useId()
   const customExpId = useId()
+  const seriousSearchId = useId()
 
-  // Separate state for each field - no cross-contamination
   const [jobDescription, setJobDescription] = React.useState("")
   const [location, setLocation] = React.useState("")
   const [experience, setExperience] = React.useState("")
   const [customExperience, setCustomExperience] = React.useState("")
+  const [seriousJobSearch, setSeriousJobSearch] = React.useState(false)
 
   const [locationSuggestions, setLocationSuggestions] = React.useState([])
   const [showSuggestions, setShowSuggestions] = React.useState(false)
   const locationInputRef = React.useRef(null)
 
-  // Filter locations based on input
+  const handleJobRequisitionClick = (e) => {
+    e.preventDefault()
+    if (jobDescription.trim() && !disabled) {
+      onSubmit(true)
+    }
+  }
+
+  const handleTalentSearchClick = (e) => {
+    e.preventDefault()
+    if (jobDescription.trim() && !disabled) {
+      onSubmit(false)
+    }
+  }
+
   const filterLocations = React.useCallback((input) => {
     if (!input.trim()) return []
     return POPULAR_LOCATIONS.filter(loc =>
       loc.toLowerCase().includes(input.toLowerCase())
-    ).slice(0, 8) // Show max 8 suggestions
+    ).slice(0, 8)
   }, [])
 
   const handleLocationChange = (e) => {
     const newLocation = e.target.value
     setLocation(newLocation)
 
-    // Show suggestions
     const suggestions = filterLocations(newLocation)
     setLocationSuggestions(suggestions)
     setShowSuggestions(suggestions.length > 0 && newLocation.length > 0)
@@ -109,18 +119,15 @@ export default function TalentSearchBar({
   }
 
   const handleLocationBlur = () => {
-    // Delay hiding suggestions to allow clicking
     setTimeout(() => setShowSuggestions(false), 150)
   }
 
-  // Parse the incoming value only once on mount or when value changes from parent
   React.useEffect(() => {
     if (value !== buildSearchQuery(jobDescription, location, experience, customExperience)) {
       parseSearchQuery(value)
     }
   }, [value])
 
-  // Build search query from individual components
   const buildSearchQuery = (job: string, loc: string, exp: string, customExp: string) => {
     let searchQuery = job.trim()
 
@@ -138,17 +145,13 @@ export default function TalentSearchBar({
     return searchQuery
   }
 
-  // Parse search query into individual components
   const parseSearchQuery = (searchQuery: string) => {
-    // Extract location (quoted or unquoted)
     const locationMatch = searchQuery.match(/location:(?:"([^"]+)"|(\S+))/i)
     const extractedLocation = locationMatch ? (locationMatch[1] || locationMatch[2]) : ""
 
-    // Extract experience (quoted or unquoted)
     const experienceMatch = searchQuery.match(/experience:(?:"([^"]+)"|(\S+))/i)
     const extractedExperience = experienceMatch ? (experienceMatch[1] || experienceMatch[2]) : ""
 
-    // Extract job description (everything except location and experience)
     const jobDesc = searchQuery
       .replace(/location:(?:"[^"]+"|[^\s]+)/gi, '')
       .replace(/experience:(?:"[^"]+"|[^\s]+)/gi, '')
@@ -157,7 +160,6 @@ export default function TalentSearchBar({
     setJobDescription(jobDesc)
     setLocation(extractedLocation)
 
-    // Determine if it's a standard experience or custom
     const standardExp = experienceOptions.find(opt => opt.value === extractedExperience)
     if (standardExp && standardExp.value !== "custom") {
       setExperience(extractedExperience)
@@ -171,7 +173,6 @@ export default function TalentSearchBar({
     }
   }
 
-  // Update search value whenever any field changes
   const updateSearchValue = React.useCallback((
     newJobDescription: string = jobDescription,
     newLocation: string = location,
@@ -187,12 +188,6 @@ export default function TalentSearchBar({
     setJobDescription(newJobDesc)
     updateSearchValue(newJobDesc)
   }
-
-  // const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  //   const newLocation = e.target.value
-  //   setLocation(newLocation)
-  //   updateSearchValue(jobDescription, newLocation)
-  // }
 
   const handleExperienceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newExperience = e.target.value
@@ -225,9 +220,8 @@ export default function TalentSearchBar({
         </Label>
       </div>
 
-      <div className="flex flex-col gap-4">
-        {/* Main Job Description Search */}
-        <div className="space-y-2">
+      <div className="flex flex-col gap-8 justify-start">
+        <div className="space-y-2 justify-start">
           <AutoResizeTextarea
             id={id}
             value={jobDescription}
@@ -255,11 +249,10 @@ export default function TalentSearchBar({
               disabled:cursor-not-allowed
             "
           />
+          <span className="flex justify-start text-sm">Accepts Boolean/X-Ray search / Job Description</span>
         </div>
 
-        {/* Optional Filters Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Location Field */}
           <div className="space-y-2 relative">
             <Label htmlFor={locationId} className="text-gray-700 text-sm font-medium">
               Location <span className="text-gray-400 font-normal">(optional)</span>
@@ -276,13 +269,12 @@ export default function TalentSearchBar({
                 placeholder="e.g., New York, Remote, Mumbai"
                 disabled={disabled}
                 className="
-              w-full bg-gray-50 text-gray-900 placeholder-gray-400 border-2 border-gray-200
-              focus:border-blue-500 focus:bg-white rounded-lg p-3 text-sm transition-all duration-200
-              disabled:opacity-50 disabled:cursor-not-allowed
-            "
+                  w-full bg-gray-50 text-gray-900 placeholder-gray-400 border-2 border-gray-200
+                  focus:border-blue-500 focus:bg-white rounded-lg p-3 text-sm transition-all duration-200
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                "
               />
 
-              {/* Suggestions Dropdown */}
               {showSuggestions && locationSuggestions.length > 0 && (
                 <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                   {locationSuggestions.map((suggestion, index) => (
@@ -299,38 +291,7 @@ export default function TalentSearchBar({
               )}
             </div>
           </div>
-          {/* <div className="space-y-2">
-            <Label htmlFor={locationId} className="text-gray-700 text-sm font-medium">
-              Location <span className="text-gray-400 font-normal">(optional)</span>
-            </Label>
-            <input
-              id={locationId}
-              type="text"
-              value={location}
-              onChange={handleLocationChange}
-              placeholder="e.g., New York, Remote, Mumbai"
-              disabled={disabled}
-              className="
-                w-full
-                bg-gray-50
-                text-gray-900
-                placeholder-gray-400
-                border-2
-                border-gray-200
-                focus:border-blue-500
-                focus:bg-white
-                rounded-lg
-                p-3
-                text-sm
-                transition-all
-                duration-200
-                disabled:opacity-50
-                disabled:cursor-not-allowed
-              "
-            />
-          </div> */}
 
-          {/* Experience Dropdown */}
           <div className="space-y-2">
             <Label htmlFor={experienceId} className="text-gray-700 text-sm font-medium">
               Years of Experience <span className="text-gray-400 font-normal">(optional)</span>
@@ -367,7 +328,6 @@ export default function TalentSearchBar({
           </div>
         </div>
 
-        {/* Custom Experience Input */}
         {experience === "custom" && (
           <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
             <Label htmlFor={customExpId} className="text-gray-700 text-sm font-medium">
@@ -401,17 +361,8 @@ export default function TalentSearchBar({
           </div>
         )}
 
-        {/* Search Info and Button */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-2">
-          <div className="text-sm text-gray-600 space-y-1">
-            <div>
-              {value.length} characters
-              {value.length > 100 && (
-                <span className="ml-2 text-green-600 font-medium">
-                  ✓ Detailed search query
-                </span>
-              )}
-            </div>
+          <div className="flex flex-col gap-2">
             {(location || getActiveExperienceLabel()) && (
               <div className="text-xs text-blue-600">
                 Active filters: {location && `Location: ${location}`} {location && getActiveExperienceLabel() && ' • '} {getActiveExperienceLabel() && `Experience: ${getActiveExperienceLabel()}`}
@@ -419,19 +370,37 @@ export default function TalentSearchBar({
             )}
           </div>
 
-          <Button
-            type="submit"
-            disabled={disabled || !jobDescription.trim()}
-            className={`
-              px-8 py-3 font-semibold text-sm transition-all duration-200 rounded-lg
-              ${(!disabled && jobDescription.trim())
-                ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }
-            `}
-          >
-            Search Talent
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <Button
+              type="button"
+              onClick={handleJobRequisitionClick}
+              disabled={disabled || !jobDescription.trim()}
+              className={`
+                px-8 py-3 font-semibold text-sm transition-all duration-200 rounded-lg
+                ${(!disabled && jobDescription.trim())
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }
+              `}
+            >
+              Create Job Requisition
+            </Button>
+
+            <Button
+              type="button"
+              disabled={disabled || !jobDescription.trim()}
+              onClick={handleTalentSearchClick}
+              className={`
+                px-8 py-3 font-semibold text-sm transition-all duration-200 rounded-lg
+                ${(!disabled && jobDescription.trim())
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }
+              `}
+            >
+              Talent Search
+            </Button>
+          </div>
         </div>
       </div>
     </div>
