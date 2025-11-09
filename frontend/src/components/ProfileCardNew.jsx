@@ -4,6 +4,7 @@ import SidebarSchedule from './Interview/SidebarSchedule';
 import { useState, useEffect } from 'react';
 
 
+
 const ProfileCard = ({ profile, onClick }) => {
     const getStatusColor = (status) => {
         switch (status) {
@@ -19,6 +20,7 @@ const ProfileCard = ({ profile, onClick }) => {
                 return 'bg-gray-100 text-gray-700';
         }
     };
+
 
     // Get platform icon and link
     const getPlatformDetails = (platform) => {
@@ -67,6 +69,16 @@ const ProfileCard = ({ profile, onClick }) => {
                 bgColor: 'bg-orange-600 hover:bg-orange-700',
                 linkPrefix: 'https://www.foundit.in/profile'
             },
+            databank: {
+                name: 'Data Bank',
+                logo: (
+                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 3.58 2 5.5v13C2 20.42 6.48 22 12 22s10-1.58 10-3.5v-13C22 3.58 17.52 2 12 2m0 3c4.42 0 8 1.34 8 3s-3.58 3-8 3-8-1.34-8-3 3.58-3 8-3m8 13c0 1.66-3.58 3-8 3s-8-1.34-8-3v-2.46c1.67 1.28 4.7 2.46 8 2.46s6.33-1.18 8-2.46v2.46m0-5c0 1.66-3.58 3-8 3s-8-1.34-8-3v-2.46c1.67 1.28 4.7 2.46 8 2.46s6.33-1.18 8-2.46v2.46z" />
+                    </svg>
+                ),
+                bgColor: 'bg-purple-600 hover:bg-purple-700',
+                linkPrefix: ''
+            },
             uploaded: {
                 name: 'Uploaded',
                 logo: (
@@ -79,8 +91,10 @@ const ProfileCard = ({ profile, onClick }) => {
             }
         };
 
+
         return platformMap[normalizedPlatform] || platformMap['uploaded'];
     };
+
 
     const [showScheduleSidebar, setShowScheduleSidebar] = useState(false);
     const [showInviteModal, setShowInviteModal] = useState(false);
@@ -89,11 +103,14 @@ const ProfileCard = ({ profile, onClick }) => {
     const [successMessage, setSuccessMessage] = useState('');
 
 
+
     const generateEmail = (name) => {
         if (!name) return 'by@gmail.com';
 
+
         const trimmedName = name.trim();
         const nameParts = trimmedName.split(/\s+/);
+
 
         if (nameParts.length === 1) {
             return `${nameParts[0].toLowerCase()}@gmail.com`;
@@ -103,25 +120,32 @@ const ProfileCard = ({ profile, onClick }) => {
     };
 
 
+
     const handlePlatformSelect = async (platform) => {
         setLoadingPlatform(platform);
 
+
         await new Promise(resolve => setTimeout(resolve, 2000));
+
 
         const email = generateEmail(profile.name);
         const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
         setSuccessMessage(`Invitation sent successfully to ${email} via ${platformName}`);
 
+
         setLoadingPlatform(null);
         setShowInviteModal(false);
         setShowSuccessToast(true);
+
 
         setTimeout(() => {
             setShowSuccessToast(false);
         }, 4000);
     };
 
-    const platformDetails = getPlatformDetails(profile.platform);
+
+    const platformDetails = getPlatformDetails(profile.source || profile.platform);
+
 
     return (
         <>
@@ -151,10 +175,12 @@ const ProfileCard = ({ profile, onClick }) => {
                 </div>
 
 
+
                 {/* Summary */}
                 <div className="mb-4">
                     <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-3">{profile.summary}</p>
                 </div>
+
 
 
                 {/* Platform Logo Badge */}
@@ -174,6 +200,7 @@ const ProfileCard = ({ profile, onClick }) => {
                 )}
 
 
+
                 {/* Buttons container */}
                 <div className="mb-4 flex gap-4">
                     <button
@@ -187,6 +214,7 @@ const ProfileCard = ({ profile, onClick }) => {
                         Send Invite
                     </button>
 
+
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
@@ -197,6 +225,7 @@ const ProfileCard = ({ profile, onClick }) => {
                     >
                         Schedule Meetings
                     </button>
+
 
 
                     <button
@@ -212,8 +241,10 @@ const ProfileCard = ({ profile, onClick }) => {
 
 
 
+
                 </div>
             </motion.div>
+
 
 
             {/* Schedule Sidebar */}
@@ -226,6 +257,7 @@ const ProfileCard = ({ profile, onClick }) => {
                     }}
                 />
             )}
+
 
 
             {/* Invite Platform Modal */}
@@ -251,6 +283,7 @@ const ProfileCard = ({ profile, onClick }) => {
                         </div>
 
 
+
                         <div className="space-y-3">
                             {/* LinkedIn Button */}
                             <button
@@ -273,6 +306,7 @@ const ProfileCard = ({ profile, onClick }) => {
                             </button>
 
 
+
                             {/* WhatsApp Button */}
                             <button
                                 onClick={() => handlePlatformSelect('whatsapp')}
@@ -292,6 +326,7 @@ const ProfileCard = ({ profile, onClick }) => {
                                 )}
                                 {loadingPlatform === 'whatsapp' ? 'Sending...' : 'WhatsApp'}
                             </button>
+
 
 
                             {/* Email Button */}
@@ -316,6 +351,7 @@ const ProfileCard = ({ profile, onClick }) => {
                         </div>
 
 
+
                         {/* Close button */}
                         <button
                             onClick={() => setShowInviteModal(false)}
@@ -327,6 +363,7 @@ const ProfileCard = ({ profile, onClick }) => {
                     </motion.div>
                 </div>
             )}
+
 
 
             {/* Success Toast Notification */}
@@ -358,4 +395,5 @@ const ProfileCard = ({ profile, onClick }) => {
 };
 
 
-export default ProfileCard;
+
+export default ProfileCard

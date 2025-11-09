@@ -45,7 +45,9 @@ const Dashboard = ({ onNavigate, onNewSearch }) => {
 
 
                         let platform = 'default';
-                        if (profile.link.includes('linkedin.com')) {
+                        if (profile.platform) {
+                            platform = profile.platform;
+                        } else if (profile.link.includes('linkedin.com')) {
                             platform = 'linkedin';
                         } else if (profile.link.includes('github.com')) {
                             platform = 'github';

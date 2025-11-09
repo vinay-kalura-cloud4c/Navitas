@@ -1,10 +1,11 @@
-import React, { useState, useCallback, useRef } from 'react'
+import React, { useState, useCallback, useRef, useEffect } from 'react'
 import InputWithButton from './comp-22'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/Card'
 import { StarsBackground } from './core/backgrounds/stars'
 import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar"
 import { IconHome, IconBookmark, IconSearch } from "@tabler/icons-react"
 import useStore from '../store/useStore'
+import { time } from 'motion/react'
 
 
 export default function LandingPage({ onSearch, onNavigate }) {
@@ -12,6 +13,7 @@ export default function LandingPage({ onSearch, onNavigate }) {
   const setProfiles = useStore(state => state.setProfiles)
   const setSelectedSearchHistory = useStore(state => state.setSelectedSearchHistory)
   const [loading, setLoading] = useState(false)
+  const [loadingStep, setLoadingStep] = useState(0)
   const isSearchingRef = useRef(false)
 
 
@@ -110,6 +112,27 @@ export default function LandingPage({ onSearch, onNavigate }) {
     }
   ]
 
+  const loadingSteps = [
+    "Thinking",
+    "Generating keywords",
+    "Searching LinkedIn",
+    "Searching Databank",
+    "Giving Scores",
+    "Collecting output"
+  ]
+
+  useEffect(() => {
+    if (loading) {
+      setLoadingStep(0)
+      let time = Math.max(Math.random() * 1000, 5000)
+      time = Math.min(time, 7000)
+      const interval = setInterval(() => {
+        setLoadingStep(prev => (prev + 1) % loadingSteps.length)
+      }, time)
+      return () => clearInterval(interval)
+    }
+  }, [loading])
+
 
   return (
     <div className="h-screen flex">
@@ -153,9 +176,9 @@ export default function LandingPage({ onSearch, onNavigate }) {
       </div>
       {loading && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white/20 backdrop-blur-md rounded-lg p-8 text-center">
+          <div className="bg-white/20 backdrop-blur-md rounded-lg p-8 text-center w-80">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-            <p className="text-white text-lg">Searching profiles...</p>
+            <p className="text-white text-lg">{loadingSteps[loadingStep]}...</p>
           </div>
         </div>
       )}

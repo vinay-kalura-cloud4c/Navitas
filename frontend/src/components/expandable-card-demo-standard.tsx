@@ -1,9 +1,11 @@
 "use client";
 
+
 import React, { useEffect, useId, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useOutsideClick } from "../hooks/use-outside-click";
 import { Button } from "./ui/Button";
+
 
 export interface Profile {
   id: string | number;
@@ -12,8 +14,10 @@ export interface Profile {
   full_summary: string;
   link: string;
   score: number;
-  platform?: string; // Add platform field
+  platform?: string;
+  source?: string; // Add source field for databank
 }
+
 
 // Platform configuration
 const PLATFORMS = {
@@ -47,6 +51,16 @@ const PLATFORMS = {
       </svg>
     )
   },
+  databank: {
+    name: 'Data Bank',
+    color: 'bg-purple-600',
+    textColor: 'text-purple-600',
+    icon: (
+      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M12 2C6.48 2 2 3.58 2 5.5v13C2 20.42 6.48 22 12 22s10-1.58 10-3.5v-13C22 3.58 17.52 2 12 2m0 3c4.42 0 8 1.34 8 3s-3.58 3-8 3-8-1.34-8-3 3.58-3 8-3m8 13c0 1.66-3.58 3-8 3s-8-1.34-8-3v-2.46c1.67 1.28 4.7 2.46 8 2.46s6.33-1.18 8-2.46v2.46m0-5c0 1.66-3.58 3-8 3s-8-1.34-8-3v-2.46c1.67 1.28 4.7 2.46 8 2.46s6.33-1.18 8-2.46v2.46z" />
+      </svg>
+    )
+  },
   default: {
     name: 'Profile',
     color: 'bg-blue-600',
@@ -58,6 +72,7 @@ const PLATFORMS = {
     )
   }
 };
+
 
 export default function ExpandableCardDemo({
   cards,
@@ -76,6 +91,7 @@ export default function ExpandableCardDemo({
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
 
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => e.key === "Escape" && setActive(null);
     document.body.style.overflow = active ? "hidden" : "auto";
@@ -83,7 +99,9 @@ export default function ExpandableCardDemo({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [active]);
 
+
   useOutsideClick(ref, () => setActive(null));
+
 
   const handleCheckboxChange = (profileId: string | number, isChecked: boolean) => {
     if (onProfileSelection) {
@@ -91,10 +109,12 @@ export default function ExpandableCardDemo({
     }
   };
 
+
   const getPlatform = (profile: Profile) => {
     console.log(profile)
-    return PLATFORMS[profile.platform?.toLowerCase() as keyof typeof PLATFORMS] || PLATFORMS.default;
+    return PLATFORMS[(profile.source || profile.platform)?.toLowerCase() as keyof typeof PLATFORMS] || PLATFORMS.default;
   };
+
 
   return (
     <>
@@ -110,6 +130,7 @@ export default function ExpandableCardDemo({
         )}
       </AnimatePresence>
 
+
       <AnimatePresence>
         {active && (
           <div className="fixed inset-0 grid place-items-center z-20">
@@ -120,6 +141,7 @@ export default function ExpandableCardDemo({
             >
               ×
             </motion.button>
+
 
             <motion.div
               layoutId={`card-${active.id}-${id}`}
@@ -135,6 +157,7 @@ export default function ExpandableCardDemo({
                     {active.name}
                   </motion.h3>
 
+
                   {/* Platform indicator in modal */}
                   <div className="flex items-center gap-2 mb-3">
                     <div className={`p-1.5 rounded ${getPlatform(active).color} text-white`}>
@@ -147,9 +170,11 @@ export default function ExpandableCardDemo({
                 </div>
               </div>
 
+
               <div className="text-gray-800 mb-4">
                 {active.full_summary}
               </div>
+
 
               <a
                 href={active.link}
@@ -160,6 +185,7 @@ export default function ExpandableCardDemo({
                 View profile link
               </a>
               <p className="text-sm text-gray-500 mb-4">Score: {active.score}</p>
+
 
               <div className="flex gap-2 items-center">
                 {selectedProfiles && onProfileSelection && (
@@ -193,9 +219,11 @@ export default function ExpandableCardDemo({
         )}
       </AnimatePresence>
 
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {cards.map((card) => {
           const isSelected = selectedProfiles?.has(card.id) || false;
+
 
           return (
             <motion.div
@@ -219,6 +247,7 @@ export default function ExpandableCardDemo({
                 </div>
               )}
 
+
               <div onClick={() => setActive(card)}>
                 <motion.h3
                   layoutId={`title-${card.id}-${id}`}
@@ -226,6 +255,7 @@ export default function ExpandableCardDemo({
                 >
                   {card.name}
                 </motion.h3>
+
 
                 {/* Platform indicator in card */}
                 <div className="flex items-center gap-2 mb-3">
@@ -237,9 +267,11 @@ export default function ExpandableCardDemo({
                   </span>
                 </div>
 
+
                 <p className="text-sm text-gray-600 mb-3 line-clamp-2">
                   {card.short_summary}
                 </p>
+
 
                 <div className="flex gap-2 items-center mt-3">
                   <Button size="sm">View Details</Button>

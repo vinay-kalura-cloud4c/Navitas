@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import './App.css'
 import LandingPage from './components/LandingPage'
 import ProfileResults from './components/ProfileResults'
-import SavedProfiles from './components/SavedProfiles'
+import DataBank from './components/DataBank'
 import Dashboard from './components/dashboard'
 import LoginPage from './components/LoginPage'
 import AuthService from './components/AuthService'
@@ -10,8 +10,9 @@ import { ResponseInterceptor } from './components/ResponseInterceptor'
 import { SearchCacheProvider } from './contexts/SearchCacheContext'
 import { Sidebar, SidebarBody, SidebarLink } from './components/ui/sidebar'
 import ApplicantTracking from './components/ApplicantTracking'
-import { IconSearch, IconDashboard, IconBookmark, IconLogout, IconUsers } from '@tabler/icons-react'
+import { IconSearch, IconDashboard, IconDatabase, IconLogout, IconUsers } from '@tabler/icons-react'
 import { motion } from 'framer-motion'
+
 
 function App() {
   // Initialize state from sessionStorage or default to 'landing'
@@ -20,14 +21,17 @@ function App() {
     return savedView || 'landing'
   })
 
+
   const [searchQuery, setSearchQuery] = useState(() => {
     const savedQuery = sessionStorage.getItem('searchQuery')
     return savedQuery || ''
   })
 
+
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showSessionExpiredMessage, setShowSessionExpiredMessage] = useState(false)
+
 
   // Check authentication on app load
   useEffect(() => {
@@ -37,29 +41,35 @@ function App() {
       setLoading(false)
     }
 
+
     checkAuth()
   }, [])
+
 
   // Persist currentView to sessionStorage whenever it changes
   useEffect(() => {
     sessionStorage.setItem('currentView', currentView)
   }, [currentView])
 
+
   // Persist searchQuery to sessionStorage whenever it changes
   useEffect(() => {
     sessionStorage.setItem('searchQuery', searchQuery)
   }, [searchQuery])
+
 
   // Handle 401 unauthorized globally
   const handleUnauthorized = () => {
     setUser(null)
     setShowSessionExpiredMessage(true)
 
+
     // Hide message after 3 seconds
     setTimeout(() => {
       setShowSessionExpiredMessage(false)
     }, 3000)
   }
+
 
   // Handle logout
   const handleLogout = async () => {
@@ -70,24 +80,29 @@ function App() {
     sessionStorage.removeItem('searchQuery')
   }
 
+
   const handleSearch = (query) => {
     setSearchQuery(query)
     setCurrentView('results')
   }
+
 
   const handleBackToSearch = () => {
     setSearchQuery('')
     setCurrentView('landing')
   }
 
+
   const handleNavigate = (view) => {
     setCurrentView(view)
   }
+
 
   const handleNewSearch = () => {
     setCurrentView('landing')
     setSearchQuery('')
   }
+
 
   // Navigation links
   const links = [
@@ -107,11 +122,12 @@ function App() {
       icon: <IconUsers className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />,
     },
     {
-      label: "Saved Profiles",
+      label: "Data Bank",
       href: "#",
-      icon: <IconBookmark className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />,
+      icon: <IconDatabase className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />,
     },
   ]
+
 
   const handleSidebarNavigation = (linkLabel) => {
     switch (linkLabel) {
@@ -124,13 +140,14 @@ function App() {
       case "ATS":
         handleNavigate('ats')
         break
-      case "Saved Profiles":
-        handleNavigate('saved')
+      case "Data Bank":
+        handleNavigate('databank')
         break
       default:
         break
     }
   }
+
 
   const isLinkActive = (linkLabel) => {
     switch (linkLabel) {
@@ -140,12 +157,13 @@ function App() {
         return currentView === 'dashboard'
       case "ATS":
         return currentView === 'ats'
-      case "Saved Profiles":
-        return currentView === 'saved'
+      case "Data Bank":
+        return currentView === 'databank'
       default:
         return false
     }
   }
+
 
   // Show loading spinner while checking auth
   if (loading) {
@@ -161,6 +179,7 @@ function App() {
       </div>
     )
   }
+
 
   // Show login page if not authenticated
   if (!user) {
@@ -188,11 +207,13 @@ function App() {
     )
   }
 
+
   // Show main app if authenticated
   return (
     <>
       {/* Global Response Interceptor */}
       <ResponseInterceptor onUnauthorized={handleUnauthorized} />
+
 
       <SearchCacheProvider>
         <div className="flex h-screen bg-gray-100 dark:bg-neutral-800">
@@ -210,6 +231,7 @@ function App() {
                   </motion.span>
                 </div>
 
+
                 {/* Navigation Links */}
                 <div className="mt-8 flex flex-col gap-2">
                   {links.map((link, idx) => (
@@ -222,6 +244,7 @@ function App() {
                   ))}
                 </div>
               </div>
+
 
               {/* User Info at Bottom */}
               <div className="border-t border-neutral-200 dark:border-neutral-700 pt-4">
@@ -247,6 +270,7 @@ function App() {
             </SidebarBody>
           </Sidebar>
 
+
           {/* Main Content */}
           <div className="flex-1 overflow-auto">
             {currentView === 'landing' && (
@@ -260,12 +284,8 @@ function App() {
                 onNewSearch={handleNewSearch}
               />
             )}
-            {currentView === 'saved' && (
-              <SavedProfiles
-                onNavigate={handleNavigate}
-                onNewSearch={handleNewSearch}
-                hasSearchResults={!!searchQuery}
-              />
+            {currentView === 'databank' && (
+              <DataBank />
             )}
             {currentView === 'dashboard' && (
               <Dashboard
@@ -282,5 +302,6 @@ function App() {
     </>
   )
 }
+
 
 export default App

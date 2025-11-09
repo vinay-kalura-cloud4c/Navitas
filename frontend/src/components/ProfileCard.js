@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardHeader, CardContent, CardFooter } from './ui/Card'
 import { Button } from './ui/Button'
 
+
 // Platform configuration
 const PLATFORMS = {
   linkedin: {
@@ -34,6 +35,16 @@ const PLATFORMS = {
       </svg>
     )
   },
+  databank: {
+    name: 'Data Bank',
+    color: 'bg-purple-600',
+    textColor: 'text-purple-600',
+    icon: (
+      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M12 2C6.48 2 2 3.58 2 5.5v13C2 20.42 6.48 22 12 22s10-1.58 10-3.5v-13C22 3.58 17.52 2 12 2m0 3c4.42 0 8 1.34 8 3s-3.58 3-8 3-8-1.34-8-3 3.58-3 8-3m8 13c0 1.66-3.58 3-8 3s-8-1.34-8-3v-2.46c1.67 1.28 4.7 2.46 8 2.46s6.33-1.18 8-2.46v2.46m0-5c0 1.66-3.58 3-8 3s-8-1.34-8-3v-2.46c1.67 1.28 4.7 2.46 8 2.46s6.33-1.18 8-2.46v2.46z" />
+      </svg>
+    )
+  },
   // Add more platforms as needed
   default: {
     name: 'Unknown',
@@ -47,6 +58,7 @@ const PLATFORMS = {
   }
 }
 
+
 const ProfileCard = ({ profile, onViewDetails }) => {
   const gradientClass = (score) => {
     if (score >= 0.8) return 'from-green-400 to-green-600'
@@ -54,13 +66,17 @@ const ProfileCard = ({ profile, onViewDetails }) => {
     return 'from-red-400 to-red-600'
   }
 
+
   const truncate = (text, max = 120) =>
     text.length > max ? text.slice(0, max).trim() + '…' : text
 
+
   const scorePercent = Math.round(profile.score * 100)
 
+
   // Get platform configuration (fallback to 'default' if platform not found)
-  const platform = PLATFORMS[profile.platform?.toLowerCase()] || PLATFORMS.default
+  const platform = PLATFORMS[profile.source?.toLowerCase()] || PLATFORMS[profile.platform?.toLowerCase()] || PLATFORMS.default
+
 
   return (
     <Card className="flex flex-col h-full hover:shadow-lg transition-shadow">
@@ -89,9 +105,11 @@ const ProfileCard = ({ profile, onViewDetails }) => {
         </span>
       </CardHeader>
 
+
       <CardContent className="flex-1">
         <p className="text-sm text-gray-600">{truncate(profile.snippet)}</p>
       </CardContent>
+
 
       <CardFooter className="pt-2 flex justify-between items-center">
         <a
@@ -114,5 +132,6 @@ const ProfileCard = ({ profile, onViewDetails }) => {
     </Card>
   )
 }
+
 
 export default ProfileCard
